@@ -1,4 +1,4 @@
-# ThreatMap: Complete Project Report
+# ThreatMap: Advanced Threat Intelligence Platform - Project Report
 
 ## 1. PROJECT OVERVIEW
 
