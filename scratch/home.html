@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ThreatMap | AI-Powered OSINT &amp; Threat Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .interactive-glow:hover {
+            box-shadow: 0 0 15px -5px rgba(59, 130, 246, 0.3);
+        }
+        body {
+            background-color: #020617;
+            color: #dae2fd;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-fixed": "#001a42",
+                      "inverse-surface": "#dae2fd",
+                      "primary-fixed-dim": "#adc6ff",
+                      "error": "#ffb4ab",
+                      "on-error-container": "#ffdad6",
+                      "secondary": "#b7c8e1",
+                      "on-primary": "#002e6a",
+                      "surface": "#0b1326",
+                      "on-primary-fixed-variant": "#004395",
+                      "tertiary-container": "#df7412",
+                      "on-tertiary-fixed": "#311400",
+                      "tertiary-fixed-dim": "#ffb786",
+                      "secondary-fixed": "#d3e4fe",
+                      "surface-bright": "#31394d",
+                      "error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#38485d",
+                      "surface-variant": "#2d3449",
+                      "on-tertiary-container": "#461f00",
+                      "outline-variant": "#424754",
+                      "secondary-fixed-dim": "#b7c8e1",
+                      "surface-container-low": "#131b2e",
+                      "surface-container-highest": "#2d3449",
+                      "on-secondary-container": "#a9bad3",
+                      "outline": "#8c909f",
+                      "on-surface-variant": "#c2c6d6",
+                      "tertiary": "#ffb786",
+                      "secondary-container": "#3a4a5f",
+                      "inverse-primary": "#005ac2",
+                      "on-primary-container": "#00285d",
+                      "on-surface": "#dae2fd",
+                      "on-tertiary": "#502400",
+                      "primary-fixed": "#d8e2ff",
+                      "on-secondary-fixed": "#0b1c30",
+                      "on-background": "#dae2fd",
+                      "surface-tint": "#adc6ff",
+                      "surface-container-lowest": "#060e20",
+                      "primary": "#adc6ff",
+                      "surface-container-high": "#222a3d",
+                      "on-error": "#690005",
+                      "inverse-on-surface": "#283044",
+                      "background": "#0b1326",
+                      "surface-dim": "#0b1326",
+                      "on-secondary": "#213145",
+                      "tertiary-fixed": "#ffdcc6",
+                      "primary-container": "#4d8eff",
+                      "surface-container": "#171f33",
+                      "on-tertiary-fixed-variant": "#723600"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "lg": "24px",
+                      "3xl": "64px",
+                      "base": "4px",
+                      "md": "16px",
+                      "2xl": "48px",
+                      "sm": "8px",
+                      "xl": "32px",
+                      "xs": "4px"
+              },
+              "fontFamily": {
+                      "display-lg": ["Inter"],
+                      "body-md": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "label-caps": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "mono-sm": ["JetBrains Mono"],
+                      "headline-md": ["Inter"],
+                      "mono-md": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "mono-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "mono-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+      </script>
+</head>
+<body class="font-body-md text-on-surface selection:bg-primary selection:text-on-primary">
+<!-- TopNavBar -->
+<nav class="fixed top-0 left-0 w-full h-16 z-50 bg-surface/80 backdrop-blur-xl border-b border-white/10 flex justify-between items-center px-lg shadow-md">
+<div class="flex items-center gap-md">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-primary">ThreatMap</span>
+<div class="hidden md:flex gap-md ml-xl">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-caps text-label-caps" href="#">Dashboard</a>
+<a class="text-on-surface-variant font-medium hover:bg-white/5 transition-colors duration-200 font-label-caps text-label-caps px-2" href="#">Intelligence</a>
+<a class="text-on-surface-variant font-medium hover:bg-white/5 transition-colors duration-200 font-label-caps text-label-caps px-2" href="#">Network</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-white/5 p-2 rounded transition-colors" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-white/5 p-2 rounded transition-colors" data-icon="settings_suggest">settings_suggest</span>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-white/5 p-2 rounded transition-colors" data-icon="account_circle">account_circle</span>
+</div>
+</nav>
+<!-- Sub-AppBar -->
+<header class="fixed top-16 left-0 w-full h-10 z-40 bg-surface-container-highest/90 border-b border-white/10 flex items-center px-lg">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-tertiary text-sm" data-icon="security">security</span>
+<span class="font-mono-sm text-mono-sm text-tertiary uppercase tracking-widest">System Status: Active Monitoring</span>
+</div>
+<div class="ml-auto flex gap-md">
+<span class="font-mono-sm text-mono-sm text-on-surface-variant">API: <span class="text-primary">ONLINE</span></span>
+<span class="font-mono-sm text-mono-sm text-on-surface-variant">UPTIME: 99.99%</span>
+</div>
+</header>
+<main class="pt-24 min-h-screen">
+<!-- Hero Section -->
+<section class="relative px-lg py-3xl overflow-hidden">
+<div class="absolute inset-0 z-0 pointer-events-none opacity-20">
+<!-- Decorative Grid Background -->
+<div class="absolute inset-0 bg-[radial-gradient(#3a4a5f_1px,transparent_1px)] [background-size:32px_32px]"></div>
+<div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[1000px] h-[400px] bg-primary/10 blur-[120px] rounded-full"></div>
+</div>
+<div class="container mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-xl items-center">
+<div class="lg:col-span-7 flex flex-col gap-md">
+<div class="inline-flex items-center gap-sm bg-primary/10 border border-primary/20 px-sm py-1 rounded-full w-fit">
+<span class="flex h-2 w-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-mono-sm text-mono-sm text-primary uppercase">v2.4.0 Engine Loaded</span>
+</div>
+<h1 class="font-display-lg text-display-lg max-w-2xl leading-tight">AI-Powered OSINT &amp; <span class="text-primary">Threat Intelligence</span></h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-xl">
+                        Unify indicators of compromise from 50+ premium sources. Automated risk scoring and deep-web correlation for modern security teams.
+                    </p>
+<!-- Quick IOC Search -->
+<div class="mt-xl max-w-2xl">
+<div class="glass-card p-base rounded-xl flex items-center border-primary/30 shadow-2xl focus-within:ring-1 focus-within:ring-primary transition-all">
+<span class="material-symbols-outlined px-md text-on-surface-variant" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 w-full font-mono-md text-mono-md py-md text-on-surface placeholder:text-outline" placeholder="Enter IP, Domain, Hash, or URL..." type="text"/>
+<button class="bg-primary text-on-primary font-label-caps text-label-caps px-xl h-12 rounded-lg mx-base hover:opacity-90 active:scale-[0.98] transition-all whitespace-nowrap">
+                                Analyze Threat
+                            </button>
+</div>
+<div class="flex gap-md mt-md">
+<span class="font-mono-sm text-mono-sm text-outline">Recent Queries:</span>
+<a class="font-mono-sm text-mono-sm text-on-surface-variant hover:text-primary transition-colors underline decoration-primary/30" href="#">185.234.12.11</a>
+<a class="font-mono-sm text-mono-sm text-on-surface-variant hover:text-primary transition-colors underline decoration-primary/30" href="#">d41d8cd98f00b204e9800998ecf8427e</a>
+</div>
+</div>
+</div>
+<div class="lg:col-span-5 relative group">
+<div class="glass-card aspect-square rounded-full flex items-center justify-center p-md border-primary/10 overflow-hidden">
+<img class="w-full h-full object-cover rounded-full opacity-60 mix-blend-overlay scale-110 group-hover:scale-100 transition-transform duration-1000" data-alt="A futuristic circular visualization of a global telecommunications network with interconnected nodes and glowing pulse lines. The image is rendered in deep navy and electric blue tones with sharp technical details, resembling a high-tech security operations center dashboard. Cinematic lighting and a subtle digital grain overlay create a sense of advanced analytical surveillance and vigilant data protection." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtdYdnChZBMSLdmtP7zagBcLq-X6YjIVjyV7BFIW4mp7B1JzqXBAZzz12_29cVNVBhL--s3Hb96H3KxJTXaLYcvc-l7KqwcfKwIZ5sa4xqlDD796b9OXY-SwgTIvL0fHR-Upv5DjGyxPHUuNOtKNh5g1tVAQtiKQ2Vn9ST3h0w6PVc8zk5fDpZOpHRxU9qUdDVbVPR0dTDRjGjJvN6IljcXhP4tGouafdoAFXlb0-W8UftGIwp8obqciB0QHEVJHXI79Uenf5Hfdc"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface to-transparent"></div>
+<!-- UI Elements Overlaying Map -->
+<div class="absolute top-1/4 right-0 glass-card p-md rounded-lg border-primary/20 animate-bounce shadow-xl">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-error" data-icon="warning" data-weight="fill">warning</span>
+<span class="font-mono-sm text-mono-sm text-error font-bold">Critical Alert</span>
+</div>
+<div class="font-mono-sm text-mono-sm text-on-surface-variant mt-1">Malicious C2 Detected</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Feature Bento Grid -->
+<section class="px-lg py-3xl bg-surface-container-lowest/50">
+<div class="container mx-auto">
+<div class="flex flex-col items-center text-center gap-sm mb-2xl">
+<span class="font-label-caps text-label-caps text-primary uppercase tracking-widest">Operation Framework</span>
+<h2 class="font-headline-lg text-headline-lg">Advanced Analytical Suite</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-md">
+<!-- Feature 1: IOC Scanner -->
+<div class="md:col-span-8 glass-card p-xl rounded-xl interactive-glow flex flex-col md:flex-row gap-xl items-center">
+<div class="flex-1 space-y-md">
+<div class="p-sm bg-primary/10 rounded-lg w-fit">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="biotech">biotech</span>
+</div>
+<h3 class="font-headline-md text-headline-md">IOC Scanner</h3>
+<p class="text-on-surface-variant font-body-md">Multi-dimensional scanning of file hashes, IPs, and domains against a unified global threat database. Automated sandboxing for high-risk assets.</p>
+<ul class="space-y-base">
+<li class="flex items-center gap-sm font-mono-sm text-mono-sm text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="check_circle">check_circle</span> 
+                                    Hash Correlation
+                                </li>
+<li class="flex items-center gap-sm font-mono-sm text-mono-sm text-primary">
+<span class="material-symbols-outlined text-sm" data-icon="check_circle">check_circle</span> 
+                                    Whois Deep Dive
+                                </li>
+</ul>
+</div>
+<div class="flex-1 bg-surface-container-high p-md rounded-lg border border-white/5 w-full">
+<div class="space-y-sm">
+<div class="flex justify-between font-mono-sm text-mono-sm text-outline"><span>SCANNING: 192.168.1.1</span> <span class="animate-pulse text-primary">78%</span></div>
+<div class="h-1.5 bg-surface-container w-full rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[78%]"></div>
+</div>
+<div class="text-[10px] font-mono-sm text-on-surface-variant opacity-50 space-y-1">
+<div>&gt; Resolving reverse DNS...</div>
+<div>&gt; Checking Spamhaus XBL...</div>
+<div>&gt; Querying VirusTotal API...</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Feature 2: Risk Scoring -->
+<div class="md:col-span-4 glass-card p-xl rounded-xl interactive-glow flex flex-col gap-md">
+<div class="p-sm bg-tertiary/10 rounded-lg w-fit">
+<span class="material-symbols-outlined text-tertiary text-3xl" data-icon="speed">speed</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Risk Scoring</h3>
+<p class="text-on-surface-variant font-body-sm">Weighted intelligence engine that translates raw data into actionable risk metrics (0-100).</p>
+<div class="mt-auto flex justify-center py-md">
+<div class="relative flex items-center justify-center">
+<svg class="w-32 h-32 transform -rotate-90">
+<circle class="text-white/5" cx="64" cy="64" fill="transparent" r="58" stroke="currentColor" stroke-width="4"></circle>
+<circle class="text-error" cx="64" cy="64" fill="transparent" r="58" stroke="currentColor" stroke-dasharray="364.4" stroke-dashoffset="109" stroke-width="8"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="font-display-lg text-display-lg leading-none text-error">72</span>
+<span class="font-mono-sm text-mono-sm text-outline uppercase">Critical</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Feature 3: MITRE Mapping -->
+<div class="md:col-span-4 glass-card p-xl rounded-xl interactive-glow flex flex-col gap-md">
+<div class="p-sm bg-secondary/10 rounded-lg w-fit">
+<span class="material-symbols-outlined text-secondary text-3xl" data-icon="account_tree">account_tree</span>
+</div>
+<h3 class="font-headline-md text-headline-md">MITRE Mapping</h3>
+<p class="text-on-surface-variant font-body-sm">Automatically map observed behaviors to the ATT&amp;CK framework for strategic defense planning.</p>
+<div class="grid grid-cols-2 gap-base mt-md">
+<div class="bg-primary/5 border border-primary/20 p-2 rounded text-[10px] font-mono-sm text-primary">T1566: Phishing</div>
+<div class="bg-primary/5 border border-primary/20 p-2 rounded text-[10px] font-mono-sm text-primary">T1059: CLI</div>
+</div>
+</div>
+<!-- Feature 4: Real-time Alerts -->
+<div class="md:col-span-8 glass-card p-xl rounded-xl interactive-glow flex flex-col gap-md relative overflow-hidden">
+<div class="z-10 flex flex-col gap-md">
+<div class="p-sm bg-primary/10 rounded-lg w-fit">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="sensors">sensors</span>
+</div>
+<h3 class="font-headline-md text-headline-md">Real-time Watchlist</h3>
+<p class="text-on-surface-variant font-body-md">Continuous monitoring of your critical assets. Get push notifications the second a new threat matches your watchlist criteria.</p>
+</div>
+<div class="absolute -right-10 top-1/2 -translate-y-1/2 opacity-20 rotate-12 pointer-events-none">
+<div class="space-y-md">
+<div class="bg-surface p-md border border-white/10 rounded-lg w-64 shadow-xl">
+<div class="h-2 w-24 bg-white/10 rounded mb-2"></div>
+<div class="h-2 w-full bg-white/5 rounded"></div>
+</div>
+<div class="bg-surface p-md border border-white/10 rounded-lg w-64 shadow-xl translate-x-12">
+<div class="h-2 w-24 bg-white/10 rounded mb-2"></div>
+<div class="h-2 w-full bg-white/5 rounded"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Trust Signals / Sources -->
+<section class="px-lg py-2xl border-t border-white/5">
+<div class="container mx-auto">
+<div class="flex flex-col md:flex-row justify-between items-center gap-xl">
+<div class="flex flex-col gap-xs">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant uppercase">Aggregated Intel Sources</h4>
+<p class="font-body-sm text-body-sm text-outline">Real-time correlation across global providers</p>
+</div>
+<div class="flex flex-wrap justify-center gap-xl opacity-60 grayscale hover:grayscale-0 transition-all">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="dataset">dataset</span>
+<span class="font-headline-md text-headline-md font-bold text-on-surface">VirusTotal</span>
+</div>
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="shield">shield</span>
+<span class="font-headline-md text-headline-md font-bold text-on-surface">AbuseIPDB</span>
+</div>
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="search_check">search_check</span>
+<span class="font-headline-md text-headline-md font-bold text-on-surface">URLScan.io</span>
+</div>
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="database">database</span>
+<span class="font-headline-md text-headline-md font-bold text-on-surface">AlienVault</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- SideNav / Quick Tools (Floating Mobile Trigger) -->
+<button class="md:hidden fixed bottom-md right-md z-50 bg-primary text-on-primary p-md rounded-full shadow-2xl">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest border-t border-white/5 h-auto md:h-12 flex flex-col md:flex-row justify-between items-center px-lg py-md md:py-0 z-50 relative">
+<div class="font-mono-sm text-mono-sm text-on-surface-variant">
+            © 2024 ThreatMap OSINT. <span class="text-primary/60">v2.4.0-stable</span>
+</div>
+<div class="flex gap-lg mt-md md:mt-0">
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors" href="#">System Status</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors" href="#">API Docs</a>
+<a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors" href="#">Support</a>
+</div>
+</footer>
+<script>
+        // Simple Interaction logic
+        document.querySelectorAll('.interactive-glow').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+            });
+        });
+
+        // Search Input Animation
+        const searchInput = document.querySelector('input');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('border-primary');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('border-primary');
+        });
+    </script>
+</body></html>

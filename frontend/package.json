@@ -1,0 +1,44 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.100.14",
+    "@types/cytoscape": "^3.21.9",
+    "@types/nprogress": "^0.2.3",
+    "@types/react-cytoscapejs": "^1.2.6",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "axios": "^1.16.1",
+    "cytoscape": "^3.33.4",
+    "framer-motion": "^12.40.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.16.0",
+    "next": "14.2.35",
+    "next-auth": "^4.24.14",
+    "nprogress": "^0.2.0",
+    "react": "^18",
+    "react-cytoscapejs": "^2.0.0",
+    "react-dom": "^18",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "recharts": "^3.8.1",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}

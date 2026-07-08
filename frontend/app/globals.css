@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #020617;
+  --foreground: #dae2fd;
+}
+
+body {
+  background: linear-gradient(135deg, #030712, #0a1628, #030712);
+  background-size: 200% 200%;
+  animation: bg-pan 12s ease-in-out infinite;
+  color: #dae2fd;
+  font-family: 'Inter', sans-serif;
+}
+
+@keyframes bg-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes scan-breathing {
+  0%, 100% { box-shadow: 0 0 0px rgba(20, 184, 166, 0); }
+  50% { box-shadow: 0 0 15px rgba(20, 184, 166, 0.3); }
+}
+
+.scan-pulse-idle {
+  animation: scan-breathing 4s ease-in-out infinite;
+}
+
+/* Glassmorphism Panel styles */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glow-hover:hover {
+  box-shadow: 0 0 15px -5px rgba(59, 130, 246, 0.3);
+  border-color: rgba(173, 198, 255, 0.4);
+}
+
+.risk-glow-critical {
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+}
+
+.risk-glow-high {
+  filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.4));
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Leaflet maps styling overrides */
+.leaflet-container {
+  background-color: #0b1326 !important;
+}
+
+.light-theme {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.light-theme img,
+.light-theme video,
+.light-theme .leaflet-container,
+.light-theme .recharts-surface {
+  filter: invert(1) hue-rotate(180deg);
+}
