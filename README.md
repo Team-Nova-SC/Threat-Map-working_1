@@ -102,6 +102,33 @@ The application will now be running at `http://localhost:3000`.
 
 ---
 
+## 🐳 Docker Deployment (Production Recommended)
+
+ThreatMap comes with full Docker support out-of-the-box, orchestrating the frontend, backend, PostgreSQL database, and Redis cache automatically.
+
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) installed and running.
+- [Docker Compose](https://docs.docker.com/compose/install/) (usually included with Docker Desktop).
+
+### Setup & Run
+1. Navigate to the root directory of the project.
+2. Ensure you have created your `.env` file inside the `backend` directory with all your API keys (you can leave `DATABASE_URL` and `REDIS_URL` as is in `.env.example`, they will be automatically overridden by Docker).
+3. Build and start the containers in detached mode:
+
+```bash
+docker-compose up --build -d
+```
+
+The application will spin up and you can access it at `http://localhost:3000`. 
+The backend API and its documentation will be at `http://localhost:8000/docs`.
+
+### Helpful Docker Commands
+- **View logs:** `docker-compose logs -f`
+- **Stop containers:** `docker-compose down`
+- **Wipe data & stop:** `docker-compose down -v` (This removes the database and cache volumes)
+
+---
+
 ## 🛡️ License & Disclaimer
 
 This project is open-source under the MIT License. 
