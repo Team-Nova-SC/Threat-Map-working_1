@@ -11,8 +11,8 @@ export const ConnectionBanner: React.FC = () => {
   countdownRef.current = countdown;
 
   useEffect(() => {
-    let BASE = process.env.NEXT_PUBLIC_API_URL || "https://threatmap-production.up.railway.app/api/v1";
-    if (BASE && !BASE.endsWith('/api/v1')) {
+    let BASE = process.env.NEXT_PUBLIC_API_URL || "/_/backend/api/v1";
+    if (BASE && BASE.startsWith('http') && !BASE.endsWith('/api/v1')) {
       BASE = BASE.replace(/\/$/, '') + '/api/v1';
     }
 
