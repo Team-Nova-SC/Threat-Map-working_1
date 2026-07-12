@@ -487,10 +487,10 @@ def get_dashboard_telemetry(db: Session = Depends(get_db)):
     high_risk_count = db.query(Scan).filter(Scan.risk_score >= 70).count()
     
     return {
-        "total_scans": total_scans if total_scans > 0 else 1284,
-        "high_risk_count": high_risk_count if high_risk_count > 0 else 50,
-        "active_apis": 5,
-        "avg_scan_time": "1.2s"
+        "total_scans": total_scans,
+        "high_risk_count": high_risk_count,
+        "active_apis": 0,
+        "avg_scan_time": "N/A"
     }
 
 # Vercel requires this for serverless functions

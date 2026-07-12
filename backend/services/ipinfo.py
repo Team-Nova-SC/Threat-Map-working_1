@@ -25,7 +25,7 @@ class IPInfoService:
                 pass
 
         # Explicit URL with IP embedded — NEVER ipinfo.io/json without IP
-        if self.token:
+        if self.token and self.token not in {"YOUR_API_KEY", "your_ipinfo_token_here"}:
             url = f"{self.base_url}/{ip}/json?token={self.token}"
         else:
             url = f"{self.base_url}/{ip}/json"
@@ -36,12 +36,13 @@ class IPInfoService:
                 response = await client.get(url)
                 if response.status_code == 200:
                     data = response.json()
-                    loc = data.get("loc", "37.751,-97.822")
-                    lat, lon = 37.751, -97.822
+                    loc = data.get("loc")
+                    lat, lon = None, None
                     try:
-                        lat_s, lon_s = loc.split(",")
-                        lat, lon = float(lat_s), float(lon_s)
-                    except ValueError:
+                        if loc:
+                            lat_s, lon_s = loc.split(",")
+                            lat, lon = float(lat_s), float(lon_s)
+                    except (ValueError, AttributeError):
                         pass
 
                     result = {
@@ -75,20 +76,13 @@ class IPInfoService:
                 return self._get_fallback_data(ip)
 
     def _get_fallback_data(self, ip: str) -> Dict[str, Any]:
-        # Return fallback data mock for geolocation coordinates
+        # Never invent a location when the upstream provider is unavailable.
         return {
             "ip": ip,
-            "city": "Ashburn",
-            "region": "Virginia",
-            "country": "US",
-            "loc": "39.0438,-77.4874",
-            "lat": 39.0438,
-            "lon": -77.4874,
-            "org": "AS16509 Amazon.com, Inc.",
-            "asn": "AS16509",
-            "postal": "20147",
-            "timezone": "America/New_York",
-            "status": "fallback",
+            "city": None, "region": None, "country": None, "loc": None,
+            "lat": None, "lon": None, "org": None, "asn": None,
+            "postal": None, "timezone": None,
+            "status": "unavailable",
             "raw": None
         }
 
