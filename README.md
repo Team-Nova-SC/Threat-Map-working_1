@@ -1,136 +1,147 @@
-# 🗺️ ThreatMap: Next-Gen Threat Intelligence Platform
+# ThreatMap Production Fix Bundle v2
 
-![ThreatMap](https://img.shields.io/badge/Status-Active-success) ![License](https://img.shields.io/badge/License-MIT-blue) ![Version](https://img.shields.io/badge/Version-1.0.0-purple)
+This bundle applies the confirmed production fixes to the current `Threat-Map-Test` repository without changing its overall frontend/backend structure. Version 2 no longer depends on an exact duplicate-health-route source block; it safely handles original, partially fixed, reformatted, and already-fixed copies.
 
-ThreatMap is a premium, full-stack Threat Intelligence platform designed to aggregate, analyze, and visualize Indicators of Compromise (IOCs) such as IPs, Domains, URLs, Hashes, and CVEs. 
+## Fixes included
 
-It acts as a single pane of glass for security analysts to triage threats without manually querying dozens of different services. By combining deterministic data from industry-leading OSINT feeds with generative AI, ThreatMap automatically correlates infrastructure, attributes attacks to known Threat Actors, maps behaviors to the MITRE ATT&CK framework, and generates plain-English mitigation strategies.
+1. Removes the fake telemetry fallback values (`1284` scans, `50` high-risk findings and fixed API count).
+2. Keeps only one `/api/v1/health` route.
+3. Removes duplicate alert-router registration.
+4. Stops the 24-hour dashboard count from falling back to the all-time count.
+5. Adds strict public IPv4/IPv6 validation.
+6. Adds strict domain validation and canonicalisation.
+7. Adds URL validation, SSRF protection, bounded response reading, redirect revalidation and TLS certificate verification.
+8. Prevents internal exception messages from being returned to users.
+9. Replaces hard-coded “Active” provider badges with data from `/dashboard/api-health`.
+10. Removes the artificial six-second scanner delay.
+11. Adds a real `/results/bulk` page with missing-session handling and JSON export.
+12. Adds 15 automated validator tests.
 
----
+## Apply the patch on Windows
 
-## 🌟 Key Features
+1. Extract this ZIP.
+2. Copy `apply_threatmap_fixes.py` into the root of your cloned ThreatMap repository—the folder containing `backend` and `frontend`.
+3. Open Command Prompt or PowerShell in that folder.
+4. Run:
 
-- **Unified IOC Scanning:** Scan IPs, Domains, URLs, Hashes, and CVEs in a single input.
-- **Risk Scoring Engine:** Deterministic 0-100 risk score based on weighted aggregations from multiple feeds.
-- **AI-Powered Mitigation:** Google Gemini 1.5 Pro generates actionable, plain-English mitigation briefs.
-- **Premium UI/UX:** Built with Framer Motion, Tailwind CSS, and Next.js for a highly responsive, animated, and dark-mode optimized experience.
-- **MITRE ATT&CK Mapping:** Automatically maps detected threat behaviors to specific MITRE TTPs.
-- **Threat Actor Attribution:** Cross-references IOCs against a database of known APT groups.
-- **Relationship Graph:** Visually plots connections between scanned subnets, ASNs, and malicious domains.
-- **Watchlist & Community Notes:** Save critical threats and collaborate with team members.
+```powershell
+python apply_threatmap_fixes.py .
+```
 
----
+The script automatically skips sections that are already fixed and creates a timestamped backup folder such as:
 
-## 🏗️ Architecture & Tech Stack
+```text
+.threatmap-backup-20260712-120413
+```
 
-- **Frontend:** Next.js 14, React, Tailwind CSS, Framer Motion, Lucide Icons
-- **Backend:** Python 3.12, FastAPI, Uvicorn, SQLAlchemy, Pydantic
-- **Database:** PostgreSQL
-- **Caching:** Redis (prevents rate-limiting on external OSINT APIs)
-- **AI Integration:** Google Gemini (Vertex AI)
+## Review and test
 
----
-
-## 🔌 Integrated OSINT Feeds
-
-ThreatMap integrates with the following security APIs. **You must provide your own API keys for these services.**
-
-- [VirusTotal](https://www.virustotal.com/) (Primary conviction signal)
-- [AbuseIPDB](https://www.abuseipdb.com/) (Crowdsourced abuse reports)
-- [GreyNoise](https://www.greynoise.io/) (Noise & scanner filtering)
-- [URLScan.io](https://urlscan.io/) (Visual DOM analysis & safe screenshots)
-- [AlienVault OTX](https://otx.alienvault.com/) (Community threat pulses)
-- [Shodan](https://www.shodan.io/) (Open ports & services)
-- [IP-API](https://ip-api.com/) (Geolocation mapping - *No API key required*)
-
----
-
-## 🚀 Installation & Local Setup
-
-### Prerequisites
-- Node.js (v18+)
-- Python (v3.10+)
-- PostgreSQL Server
-- Redis Server
-
-### 1. Database Setup
-Create a PostgreSQL database named `threatmap` (or adjust the URL in your environment variables).
-
-### 2. Backend Configuration
-Navigate to the backend directory, set up your Python environment, and configure your API keys.
-
-```bash
+```powershell
+git diff
+python -m compileall backend
 cd backend
-python -m venv venv
-
-# Windows
-.\venv\Scripts\activate
-# Mac/Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-**Configure API Keys:**
-Rename `.env.example` to `.env` and insert your private API keys. 
-> **Note:** The `.env` file is included in `.gitignore` to prevent accidental credential leaks. Do not commit your real API keys!
-
-```bash
-# Example of what your .env should look like
-DATABASE_URL=postgresql://postgres:password@localhost:5432/threatmap
-REDIS_URL=redis://localhost:6379/0
-
-VT_API_KEY=your_api_key_here
-# ... add other keys
-```
-
-**Start the Backend:**
-```bash
-python -m uvicorn main:app --reload --port 8000
-```
-
-### 3. Frontend Configuration
-Navigate to the frontend directory and start the Next.js development server.
-
-```bash
-cd frontend
+python -m pytest tests/test_validators.py -q
+cd ..\frontend
 npm install
-npm run dev
+npm run lint
+npm run build
 ```
 
-The application will now be running at `http://localhost:3000`.
+Expected validator result:
 
----
-
-## 🐳 Docker Deployment (Production Recommended)
-
-ThreatMap comes with full Docker support out-of-the-box, orchestrating the frontend, backend, PostgreSQL database, and Redis cache automatically.
-
-### Prerequisites
-- [Docker](https://docs.docker.com/get-docker/) installed and running.
-- [Docker Compose](https://docs.docker.com/compose/install/) (usually included with Docker Desktop).
-
-### Setup & Run
-1. Navigate to the root directory of the project.
-2. Ensure you have created your `.env` file inside the `backend` directory with all your API keys (you can leave `DATABASE_URL` and `REDIS_URL` as is in `.env.example`, they will be automatically overridden by Docker).
-3. Build and start the containers in detached mode:
-
-```bash
-docker-compose up --build -d
+```text
+15 passed
 ```
 
-The application will spin up and you can access it at `http://localhost:3000`. 
-The backend API and its documentation will be at `http://localhost:8000/docs`.
+## Commit and push
 
-### Helpful Docker Commands
-- **View logs:** `docker-compose logs -f`
-- **Stop containers:** `docker-compose down`
-- **Wipe data & stop:** `docker-compose down -v` (This removes the database and cache volumes)
+From the repository root:
 
----
+```powershell
+git add backend frontend
+git commit -m "Fix telemetry, IOC validation, API health and bulk results"
+git push origin main
+```
 
-## 🛡️ License & Disclaimer
+When Git reports that the remote contains newer commits, run:
 
-This project is open-source under the MIT License. 
+```powershell
+git pull --rebase origin main
+git push origin main
+```
 
-*Disclaimer: ThreatMap is a tool for authorized security research and incident response. Ensure you comply with the Terms of Service of all integrated third-party APIs.*
+Do not use `git push --force` unless you intentionally want to overwrite remote history.
+
+## Deployment order
+
+1. Deploy the backend first.
+2. Confirm `/api/v1/health` returns one successful response.
+3. Deploy the frontend on Vercel.
+4. Confirm the frontend proxy environment variables still point to the deployed backend.
+
+## Production smoke tests
+
+### Valid IP
+
+```text
+8.8.8.8
+```
+
+Expected: accepted and scanned.
+
+### Invalid/private IPs
+
+```text
+999.999.999.999
+127.0.0.1
+10.0.0.1
+```
+
+Expected: HTTP 400 with a clear validation message.
+
+### Valid domain
+
+```text
+github.com
+```
+
+Expected: accepted and canonicalised.
+
+### Invalid domain
+
+```text
+not a domain
+https://github.com/path
+```
+
+Expected: HTTP 400.
+
+### Safe URL validation
+
+```text
+https://github.com/
+```
+
+Expected: accepted.
+
+### Blocked URL targets
+
+```text
+http://localhost/
+http://127.0.0.1/
+file:///etc/passwd
+```
+
+Expected: HTTP 400; no outbound request to internal/local resources.
+
+### Dashboard
+
+With an empty database, the telemetry must show zero—not demonstration values.
+
+### Bulk results
+
+Opening `/results/bulk` without a previous bulk scan must display “Bulk results unavailable” and a return-to-scanner button rather than remaining in an endless processing state.
+
+## Important environment check
+
+Use actual secrets only in your hosting provider’s environment variables. Do not commit API keys to GitHub. Rotate any key that has previously been pasted into chat, source code, screenshots or public repository history.
