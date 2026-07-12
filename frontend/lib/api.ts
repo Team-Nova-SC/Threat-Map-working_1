@@ -295,4 +295,8 @@ export const api = {
     const response = await apiClient.get(`/tools/http-headers`, { params: { url } });
     return response.data;
   },
+  toolsGoogleDorks: async (target: string, mode: string = "domain") => {
+    const response = await apiClient.post(`/tools/google-dorks`, { target, mode });
+    return response.data;
+  },
 };

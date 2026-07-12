@@ -71,6 +71,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       icon: <span className="material-symbols-outlined text-[20px]">build</span>,
     },
     {
+      name: "Google Dorking",
+      href: "/google-dorking",
+      icon: <span className="material-symbols-outlined text-[20px]">manage_search</span>,
+    },
+    {
       name: "Watchlist & Alerts",
       href: "/watchlist",
       icon: <span className="material-symbols-outlined text-[20px]">visibility</span>,

@@ -98,6 +98,14 @@ except Exception as e:
     traceback.print_exc()
     tools = None
 
+try:
+    from routers import google_dorking
+    print("google_dorking router imported OK")
+except Exception as e:
+    print(f"google_dorking router failed: {e}")
+    traceback.print_exc()
+    google_dorking = None
+
 # Setup logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -224,6 +232,8 @@ if chat:
     app.include_router(chat.router, prefix=settings.API_V1_STR)
 if tools:
     app.include_router(tools.router, prefix=settings.API_V1_STR)
+if google_dorking:
+    app.include_router(google_dorking.router, prefix=settings.API_V1_STR)
 
 try:
     from routers import threat_actors
