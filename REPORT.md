@@ -3,7 +3,7 @@
 ## 1. PROJECT OVERVIEW
 
 **What is ThreatMap**
-ThreatMap is a premium, full-stack Threat Intelligence platform designed to aggregate, analyze, and visualize Indicators of Compromise (IOCs) such as IPs, Domains, URLs, Hashes, and CVEs. It acts as a single pane of glass for security analysts to triage threats without manually querying dozens of different services.
+ThreatMap is a premium, full-stack Threat Intelligence platform designed to aggregate, analyze, and visualize Indicators of Compromise (IOCs) such as IPs, Domains, URLs, Hashes, and CVEs. It includes advanced features like automated Google Dorking and acts as a single pane of glass for security analysts to triage threats without manually querying dozens of different services.
 
 **Purpose and Goals**
 The primary goal of ThreatMap is to accelerate incident response and threat hunting. By combining deterministic data from industry-leading OSINT feeds with generative AI, ThreatMap automatically correlates infrastructure, attributes attacks to known Threat Actors, maps behaviors to the MITRE ATT&CK framework, and generates plain-English mitigation strategies.
