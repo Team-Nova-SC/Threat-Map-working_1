@@ -6,20 +6,32 @@ import RiskBadge from "@/components/RiskBadge";
 
 export default function BulkResultsPage() {
   const [results, setResults] = useState<any>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const data = sessionStorage.getItem("bulkScanResults");
     if (data) {
-      setResults(JSON.parse(data));
+      try { setResults(JSON.parse(data)); } catch { setResults(null); }
     }
+    setHydrated(true);
   }, []);
 
-  if (!results) {
+  if (!hydrated) {
     return (
       <div className="max-w-4xl mx-auto py-16 text-center px-4 md:px-8">
         <span className="animate-spin inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full mb-4" />
-        <h2 className="text-xl font-bold text-white mb-2">Processing Bulk Telemetry</h2>
-        <p className="text-on-surface-variant text-sm">Validating indicators across threat intelligence engines...</p>
+        <h2 className="text-xl font-bold text-white mb-2">Loading Bulk Analytics</h2>
+        <p className="text-on-surface-variant text-sm">Restoring the selected bulk scan...</p>
+      </div>
+    );
+  }
+
+  if (!results) {
+    return (
+      <div className="max-w-xl mx-auto py-16 text-center px-4">
+        <h2 className="text-xl font-bold text-white mb-2">No bulk scan selected</h2>
+        <p className="text-on-surface-variant text-sm mb-6">Start a Bulk Scan to populate this analytics page.</p>
+        <Link href="/" className="bg-primary text-on-primary py-2 px-5 rounded-lg text-sm font-bold">Start Bulk Scan</Link>
       </div>
     );
   }

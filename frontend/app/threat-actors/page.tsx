@@ -10,14 +10,17 @@ export default function ThreatActorsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   const fetchActors = async () => {
     try {
       setIsLoading(true);
+      setError("");
       const data = await api.getThreatActors();
       setActors(data);
     } catch (err) {
       console.error(err);
+      setError("Threat actor data could not be loaded. Check the API connection and retry.");
     } finally {
       setIsLoading(false);
     }
@@ -37,6 +40,7 @@ export default function ThreatActorsPage() {
       setTimeout(fetchActors, 10000);
     } catch (err) {
       console.error(err);
+      setError("MITRE ATT&CK synchronization failed. Please retry.");
     } finally {
       setIsSyncing(false);
     }
@@ -89,6 +93,17 @@ export default function ThreatActorsPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="glass-panel p-8 rounded-xl text-center">
+          <h3 className="font-bold text-white mb-2">Threat actor data unavailable</h3>
+          <p className="text-sm text-on-surface-variant mb-4">{error}</p>
+          <button onClick={fetchActors} className="bg-primary text-on-primary px-4 py-2 rounded-lg text-xs font-bold">Retry</button>
+        </div>
+      ) : actors.length === 0 ? (
+        <div className="glass-panel p-8 rounded-xl text-center">
+          <h3 className="font-bold text-white mb-2">No threat actors available</h3>
+          <p className="text-sm text-on-surface-variant">The local MITRE ATT&CK dataset is empty. Use “Sync MITRE DB” to import current records.</p>
         </div>
       ) : (
         <motion.div 

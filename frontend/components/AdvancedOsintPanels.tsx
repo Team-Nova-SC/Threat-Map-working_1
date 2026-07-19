@@ -98,7 +98,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
           <DetectionCard
             title="Attack Surface (Shodan)"
             subtitle="Known vulnerabilities & exposed services on this IP"
-            status={data.shodan?.vulns?.length > 0 ? "VULNERABLE" : "Clean"}
+            status={data.shodan?.status === "success" ? (data.shodan?.vulns?.length > 0 ? "VULNERABLE" : "No findings") : "Not available"}
             isMalicious={data.shodan?.vulns?.length > 0}
             iconName="radar"
           >
@@ -106,7 +106,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${data.shodan?.vulns?.length ? 'bg-error animate-ping' : 'bg-success'}`}></div>
-                  <span>CVEs Found: {data.shodan?.vulns?.length || 0}</span>
+                  <span>CVEs Found: {data.shodan?.status === "success" ? (data.shodan?.vulns?.length || 0) : "Not available"}</span>
                 </div>
                 {data.shodan?.vulns?.length > 0 && (
                   <div className="flex gap-1 flex-wrap">
@@ -128,7 +128,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
           <DetectionCard
             title="Dark Web Exposure"
             subtitle="Mentions in hacker forums and leaked DBs"
-            status={data.darkweb?.mentions > 0 ? "Exposed" : "Clear"}
+            status={data.darkweb?.status === "success" ? (data.darkweb?.mentions > 0 ? "Exposed" : "No findings") : "Not available"}
             isMalicious={data.darkweb?.mentions > 0}
             iconName="public_off"
           >
@@ -136,7 +136,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
               <div className="flex justify-between text-[10px] font-mono-sm text-on-surface-variant mb-1">
                 <span>Threat Level</span>
                 <span className={data.darkweb?.mentions > 0 ? "text-error" : "text-success"}>
-                  {data.darkweb?.mentions} Mentions
+                  {data.darkweb?.status === "success" ? `${data.darkweb?.mentions || 0} Mentions` : "Not available"}
                 </span>
               </div>
               <div className="w-full bg-surface-variant rounded-full h-1.5 overflow-hidden">

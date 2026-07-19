@@ -2,6 +2,7 @@ import logging
 import httpx
 from typing import Dict, Any
 from core.config import settings
+from services.provider_result import provider_result, unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +47,12 @@ class AlienVaultService:
                         for fam in pulse.get("malware_families", []):
                             malware_families.add(fam.get("name") if isinstance(fam, dict) else fam)
 
-                    return {
+                    return provider_result("AlienVault OTX", "success", {
                         "pulse_count": pulse_count,
                         "tags": list(tags)[:10],
                         "malware_families": list(malware_families)[:5],
-                        "status": "success",
                         "raw": data
-                    }
+                    })
                 else:
                     logger.warning(f"OTX request failed with status {response.status_code}. Returning fallback.")
                     return self._get_fallback_data(indicator)
@@ -61,12 +61,6 @@ class AlienVaultService:
                 return self._get_fallback_data(indicator)
 
     def _get_fallback_data(self, indicator: str) -> Dict[str, Any]:
-        return {
-            "pulse_count": 24,
-            "tags": ["Emotet", "C2", "Botnet", "Malicious-IP", "Brute-Force"],
-            "malware_families": ["Emotet", "CobaltStrike"],
-            "status": "fallback",
-            "raw": None
-        }
+        return unavailable("AlienVault OTX", "Provider did not return a result")
 
 alienvault_service = AlienVaultService()

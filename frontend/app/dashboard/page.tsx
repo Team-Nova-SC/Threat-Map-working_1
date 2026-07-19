@@ -51,7 +51,9 @@ export default function Dashboard() {
     staleTime: 60000,
   });
 
-  const loading = statsLoading || activityLoading || topIocsLoading || apiHealthLoading;
+  // The dashboard shell depends only on stats. Secondary widgets render their
+  // own loading/empty state so one slow provider cannot blank the whole page.
+  const loading = statsLoading;
   const error = statsError ? "Failed to fetch telemetry metrics from backend." : "";
 
   const dismissMutation = useMutation({

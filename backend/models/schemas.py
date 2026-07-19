@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from datetime import datetime
 
 class ScanBase(BaseModel):
@@ -19,6 +19,74 @@ class ScanResponse(ScanBase):
     created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProviderData(BaseModel):
+    status: str
+    source: str
+    retrieved_at: datetime
+    error: Optional[str] = None
+    model_config = ConfigDict(extra="allow")
+
+
+class IPReportData(BaseModel):
+    report_schema: Literal["ip.v1"]
+    virustotal: ProviderData
+    abuseipdb: ProviderData
+    greynoise: ProviderData
+    ipinfo: ProviderData
+    alienvault_otx: ProviderData
+    risk_confidence: Dict[str, Any]
+    ai_insights: Optional[Dict[str, Any]] = None
+
+
+class DomainReportData(BaseModel):
+    report_schema: Literal["domain.v1"]
+    virustotal: Dict[str, Any]
+    urlscan: Dict[str, Any]
+    alienvault_otx: Dict[str, Any]
+    dns_records: Dict[str, Any]
+    whois_records: Dict[str, Any]
+    ssl_metadata: Dict[str, Any]
+    risk_confidence: Dict[str, Any]
+    model_config = ConfigDict(extra="allow")
+
+
+class URLReportData(BaseModel):
+    report_schema: Literal["url.v1"]
+    virustotal: Dict[str, Any]
+    urlscan: Dict[str, Any]
+    alienvault_otx: Dict[str, Any]
+    risk_confidence: Dict[str, Any]
+    model_config = ConfigDict(extra="allow")
+
+
+class HashReportData(BaseModel):
+    report_schema: Literal["hash.v1"]
+    virustotal: Dict[str, Any]
+    alienvault_otx: Dict[str, Any]
+    risk_confidence: Dict[str, Any]
+    model_config = ConfigDict(extra="allow")
+
+
+class IPScanResponse(ScanResponse):
+    type: Literal["ip"]
+    raw_data: IPReportData
+
+
+class DomainScanResponse(ScanResponse):
+    type: Literal["domain"]
+    raw_data: DomainReportData
+
+
+class URLScanResponse(ScanResponse):
+    type: Literal["url"]
+    raw_data: URLReportData
+
+
+class HashScanResponse(ScanResponse):
+    type: Literal["hash"]
+    raw_data: HashReportData
 
 
 class WatchlistBase(BaseModel):

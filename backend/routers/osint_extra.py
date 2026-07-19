@@ -350,7 +350,9 @@ async def cve_lookup(cve_id: str):
 
             references = [r.get("url") for r in cve.get("references", [])[:5] if r.get("url")]
 
-            return {
+            from services.provider_result import provider_result
+            return provider_result("NIST NVD", "success", {
+                "report_schema": "cve.v1",
                 "cve_id": cve_id,
                 "description": description,
                 "cvss_score": cvss_score,
@@ -360,8 +362,7 @@ async def cve_lookup(cve_id: str):
                 "last_modified": cve.get("lastModified", ""),
                 "affected_products": list(set(affected_products))[:10],
                 "references": references,
-                "status": "success"
-            }
+            })
     except Exception as e:
         logger.error(f"CVE lookup failed for {cve_id}: {e}")
         return {"cve_id": cve_id, "status": "error", "detail": str(e)}
@@ -472,46 +473,18 @@ async def enumerate_dns_records(domain: str):
 # ─────────────────────────────────────────
 @router.get("/shodan/{ip}")
 async def shodan_lookup(ip: str):
-    """Mock Shodan endpoint to demonstrate IoT/Server vulnerabilities."""
-    await asyncio.sleep(0.5) # Simulate API latency
-    return {
-        "ip": ip,
-        "os": "Linux 4.x",
-        "isp": "Amazon.com, Inc.",
-        "vulns": ["CVE-2021-44228", "CVE-2019-11043", "CVE-2023-23397"] if int(ip.split(".")[-1]) % 2 == 0 else [],
-        "banners": [
-            {"port": 22, "data": "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"},
-            {"port": 80, "data": "HTTP/1.1 200 OK\r\nServer: nginx/1.18.0"}
-        ],
-        "status": "success"
-    }
+    """Shodan is unavailable until a real provider integration is configured."""
+    from services.provider_result import unavailable
+    return unavailable("Shodan", "Provider integration is not configured")
 
 # ─────────────────────────────────────────
 # 12. DARK WEB MENTIONS (MOCK)
 # ─────────────────────────────────────────
 @router.get("/darkweb/{indicator}")
 async def dark_web_lookup(indicator: str):
-    """Mock Dark Web intelligence to demonstrate leak exposure."""
-    await asyncio.sleep(0.6)
-    
-    import hashlib
-    score = int(hashlib.md5(indicator.encode()).hexdigest()[:2], 16)
-    
-    if score < 100:
-        return {
-            "indicator": indicator,
-            "mentions": 0,
-            "forums": [],
-            "status": "success"
-        }
-    
-    return {
-        "indicator": indicator,
-        "mentions": score % 15 + 1,
-        "forums": ["XSS.is", "BreachForums", "Exploit.in"][:(score % 3 + 1)],
-        "last_seen": (datetime.datetime.utcnow() - datetime.timedelta(days=score % 30)).isoformat(),
-        "status": "success"
-    }
+    """Dark-web intelligence is unavailable without a real provider."""
+    from services.provider_result import unavailable
+    return unavailable("Dark-web intelligence", "Provider integration is not configured")
 
 # ─────────────────────────────────────────
 # 13. ACTIVE WEB VULNERABILITY SCANNER (ENHANCED)

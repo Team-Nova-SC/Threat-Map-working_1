@@ -6,20 +6,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from core.cache import cache_service
 from models.database import get_db, Scan
-from models.schemas import ScanResponse, ScanCreate
+from models.schemas import DomainScanResponse, ScanCreate
 from services.virustotal import virustotal_service
 from services.urlscan import urlscan_service
 from services.alienvault import alienvault_service
 from services.osint import osint_service
 from services.risk_engine import risk_engine
 from services.ai_service import ai_service
-from services.whoisjson import whoisjson_service
-from services.domainscan import domainscan_service
+from services.provider_result import ensure_provenance, unavailable
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyze", tags=["Domain Analysis"])
 
-@router.post("/domain", response_model=ScanResponse)
+@router.post("/domain", response_model=DomainScanResponse)
 async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
     try:
         domain = payload.indicator.strip()
@@ -33,7 +32,7 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             if cached_data:
                 try:
                     logger.info(f"Cache hit for domain: {domain}")
-                    return ScanResponse(**json.loads(cached_data))
+                    return DomainScanResponse(**json.loads(cached_data))
                 except Exception:
                     pass
 
@@ -48,23 +47,23 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             whois_task = asyncio.wait_for(osint_service.get_whois_data(domain), timeout=30.0)
             ssl_task = asyncio.wait_for(osint_service.get_ssl_metadata(domain), timeout=30.0)
             
-            # Advanced Analytical Tasks
-            whoisjson_task = asyncio.wait_for(whoisjson_service.get_domain_data(domain), timeout=30.0)
-            domainscan_task = asyncio.wait_for(domainscan_service.get_scan_data(domain), timeout=30.0)
-
-            vt_res, urlscan_res, otx_res, dns_res, whois_res, ssl_res, whoisjson_res, domainscan_res = await asyncio.gather(
-                vt_task, urlscan_task, otx_task, dns_task, whois_task, ssl_task, whoisjson_task, domainscan_task,
+            vt_res, urlscan_res, otx_res, dns_res, whois_res, ssl_res = await asyncio.gather(
+                vt_task, urlscan_task, otx_task, dns_task, whois_task, ssl_task,
                 return_exceptions=True
             )
 
             vt_res = vt_res if not isinstance(vt_res, Exception) else virustotal_service._get_fallback_data()
             urlscan_res = urlscan_res if not isinstance(urlscan_res, Exception) else urlscan_service._get_fallback_data(domain)
             otx_res = otx_res if not isinstance(otx_res, Exception) else alienvault_service._get_fallback_data(domain)
-            dns_res = dns_res if not isinstance(dns_res, Exception) else {"A": [], "MX": [], "TXT": [], "NS": []}
-            whois_res = whois_res if not isinstance(whois_res, Exception) else {"registrar": "Unknown", "creation_date": "", "expiration_date": "", "registrant_org": ""}
-            ssl_res = ssl_res if not isinstance(ssl_res, Exception) else {"issuer": "Unknown", "subject": domain, "valid_from": "", "valid_to": "", "serial_number": "", "version": 3}
-            whoisjson_res = whoisjson_res if not isinstance(whoisjson_res, Exception) else {}
-            domainscan_res = domainscan_res if not isinstance(domainscan_res, Exception) else {}
+            dns_res = dns_res if not isinstance(dns_res, Exception) else unavailable("DNS", str(dns_res), "timeout" if isinstance(dns_res, asyncio.TimeoutError) else "error")
+            whois_res = whois_res if not isinstance(whois_res, Exception) else unavailable("WHOIS", str(whois_res), "timeout" if isinstance(whois_res, asyncio.TimeoutError) else "error")
+            ssl_res = ssl_res if not isinstance(ssl_res, Exception) else unavailable("TLS certificate", str(ssl_res), "timeout" if isinstance(ssl_res, asyncio.TimeoutError) else "error")
+            vt_res = ensure_provenance(vt_res, "VirusTotal")
+            urlscan_res = ensure_provenance(urlscan_res, "urlscan.io")
+            otx_res = ensure_provenance(otx_res, "AlienVault OTX")
+            dns_res = ensure_provenance(dns_res, "DNS")
+            whois_res = ensure_provenance(whois_res, "WHOIS")
+            ssl_res = ensure_provenance(ssl_res, "TLS certificate")
 
         except Exception as e:
             logger.error(f"[domain] Parallel lookups failed: {e}", exc_info=True)
@@ -113,10 +112,9 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             "dns_records": dns_res,
             "whois_records": whois_res,
             "ssl_metadata": ssl_res,
-            "whoisjson": whoisjson_res,
-            "domainscan": domainscan_res,
+            "report_schema": "domain.v1",
             "historical_whois_changes": whois_changes,
-            "risk_confidence": {"score": risk_results.get("confidence_score", 0), "level": risk_results.get("confidence_level", "LOW")}
+            "risk_confidence": risk_results
         }
 
         # 4. Request AI brief — isolated, never crashes the route
@@ -130,8 +128,8 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
         except Exception:
             logger.error("[domain] AI brief failed unexpectedly; using inline fallback.", exc_info=True)
             ai_brief = {
-                "summary": "AI unavailable", "threat_category": "unknown",
-                "confidence": "low", "recommendations": [], "playbook": [], "mitre_tactics": []
+                "status": "unavailable", "summary": "Not available", "threat_category": "Not available",
+                "confidence": "Not available", "recommendations": [], "playbook": [], "mitre_tactics": []
             }
 
         full_raw_data = {**raw_aggregation, "ai_insights": ai_brief}
@@ -156,7 +154,7 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             db.rollback()
             logger.error(f"[domain] Failed to record domain scan: {dbe}")
 
-        response = ScanResponse.model_validate(db_scan)
+        response = DomainScanResponse.model_validate(db_scan)
 
         # 6. Cache output
         try:

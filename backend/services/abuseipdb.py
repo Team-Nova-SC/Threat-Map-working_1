@@ -2,6 +2,7 @@ import logging
 import httpx
 from typing import Dict, Any
 from core.config import settings
+from services.provider_result import provider_result, unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +33,17 @@ class AbuseIPDBService:
                 response = await client.get(url, headers=self.headers, params=params)
                 if response.status_code == 200:
                     data = response.json().get("data", {})
-                    return {
+                    return provider_result("AbuseIPDB", "success", {
                         "ipAddress": data.get("ipAddress", ip),
                         "abuseConfidenceScore": data.get("abuseConfidenceScore", 0),
                         "totalReports": data.get("totalReports", 0),
-                        "countryCode": data.get("countryCode", "US"),
-                        "countryName": data.get("countryName", "United States"),
+                        "countryCode": data.get("countryCode"),
+                        "countryName": data.get("countryName"),
                         "domain": data.get("domain", ""),
                         "isp": data.get("isp", ""),
                         "isTor": data.get("isTor", False),
-                        "status": "success",
                         "raw": data
-                    }
+                    })
                 else:
                     logger.warning(f"AbuseIPDB request failed with status {response.status_code}. Returning fallback.")
                     return self._get_fallback_data(ip)
@@ -53,17 +53,6 @@ class AbuseIPDBService:
 
     def _get_fallback_data(self, ip: str) -> Dict[str, Any]:
         # Return CLEAN zeros — API failures must never inflate risk scores
-        return {
-            "ipAddress": ip,
-            "abuseConfidenceScore": 0,
-            "totalReports": 0,
-            "countryCode": "US",
-            "countryName": "United States",
-            "domain": "",
-            "isp": "Unknown",
-            "isTor": False,
-            "status": "fallback",
-            "raw": None
-        }
+        return unavailable("AbuseIPDB", "Provider did not return a result")
 
 abuse_ipdb_service = AbuseIPDBService()

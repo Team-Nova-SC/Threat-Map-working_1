@@ -247,13 +247,17 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   }
 
   // ── Risk breakdown weights ───────────────────────────────────────────────
-  const vtScore    = Math.min(100, (vt.malicious || 0) * 5);
-  const abuseScore = abuse.abuseConfidenceScore || 0;
-  const gnScore    = gn.classification === "malicious" ? 80 : gn.noise ? 30 : 0;
+  const scoreComponents = raw.risk_confidence?.components || {};
+  const vtScore = scoreComponents.virustotal?.score;
+  const abuseScore = scoreComponents.abuseipdb?.score;
+  const gnScore = scoreComponents.greynoise?.score;
   const plainEnglish = getPlainEnglishSummary(scan.risk_score);
 
   // count active feeds
-  const activeFeedCount = [vt, abuse, gn, otx, urlscan].filter(f => Object.keys(f).length > 0).length || 5;
+  const availableStatuses = new Set(["success", "not_found", "not_seen"]);
+  const reportFeeds = scan.type === "ip" ? [vt, abuse, gn] : [vt];
+  const activeFeedCount = raw.risk_confidence?.provider_count ?? reportFeeds.filter((feed: any) => availableStatuses.has(feed.status)).length;
+  const providerValue = (feed: any, value: React.ReactNode) => availableStatuses.has(feed.status) ? value : "Not available";
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-8 mt-6">
@@ -475,12 +479,12 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               <div key={engine.label}>
                 <div className="flex justify-between text-[10px] font-mono-sm mb-1">
                   <span className="text-on-surface-variant">{engine.label} <span className="opacity-50">({engine.desc})</span></span>
-                  <span className="text-white font-bold">{engine.score}<span className="text-on-surface-variant">/100</span></span>
+                  <span className="text-white font-bold">{engine.score == null ? "Not available" : <>{engine.score}<span className="text-on-surface-variant">/100</span></>}</span>
                 </div>
                 <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-1000 ${engine.color}`}
-                    style={{ width: `${engine.score}%` }}
+                    style={{ width: `${engine.score ?? 0}%` }}
                   />
                 </div>
               </div>
@@ -598,7 +602,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
           <DetectionCard
             title="VirusTotal"
             subtitle="Checked by 90+ antivirus engines worldwide"
-            status={`${vt.malicious || 0} / ${(vt.malicious || 0) + (vt.harmless || 0)} flags`}
+            status={providerValue(vt, `${vt.malicious || 0} / ${(vt.malicious || 0) + (vt.harmless || 0)} flags`) as string}
             isMalicious={vt.malicious > 0}
             iconName="security"
           >
@@ -619,18 +623,18 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             <DetectionCard
               title="AbuseIPDB"
               subtitle="Community-sourced abuse reports"
-              status={`${abuse.abuseConfidenceScore || 0}% abuse`}
+              status={providerValue(abuse, `${abuse.abuseConfidenceScore || 0}% abuse`) as string}
               isMalicious={abuse.abuseConfidenceScore > 0}
               iconName="gpp_bad"
             >
               <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
                 <div className="flex justify-between">
                   <span>Total Reports:</span>
-                  <span className="text-white font-bold">{abuse.totalReports || 0}</span>
+                  <span className="text-white font-bold">{providerValue(abuse, abuse.totalReports ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Last Reported:</span>
-                  <span className="text-white">{abuse.lastReportedAt ? new Date(abuse.lastReportedAt).toLocaleDateString() : "Never"}</span>
+                  <span className="text-white">{providerValue(abuse, abuse.lastReportedAt ? new Date(abuse.lastReportedAt).toLocaleDateString() : "Not available")}</span>
                 </div>
               </div>
             </DetectionCard>
@@ -641,7 +645,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             <DetectionCard
               title="GreyNoise"
               subtitle="Internet background noise check"
-              status={gn.classification || "unknown"}
+              status={providerValue(gn, gn.classification || "Not available") as string}
               isMalicious={gn.classification === "malicious"}
               iconName="hearing"
             >
@@ -662,7 +666,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
           <DetectionCard
             title="AlienVault OTX"
             subtitle="Global threat intelligence feeds"
-            status={`${otx.pulse_count || 0} pulses`}
+            status={providerValue(otx, `${otx.pulse_count || 0} pulses`) as string}
             isMalicious={otx.pulse_count > 0}
             iconName="hub"
           >

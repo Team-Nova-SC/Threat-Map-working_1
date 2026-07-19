@@ -7,16 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from core.cache import cache_service
 from models.database import get_db, Scan
-from models.schemas import ScanResponse, ScanCreate
+from models.schemas import HashScanResponse, ScanCreate
 from services.virustotal import virustotal_service
 from services.alienvault import alienvault_service
 from services.risk_engine import risk_engine
 from services.ai_service import ai_service
+from services.provider_result import ensure_provenance
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyze", tags=["File Hash Analysis"])
 
-@router.post("/hash", response_model=ScanResponse)
+@router.post("/hash", response_model=HashScanResponse)
 async def analyze_hash(payload: ScanCreate, db: Session = Depends(get_db)):
     try:
         file_hash = payload.indicator.strip().lower()
@@ -35,7 +36,7 @@ async def analyze_hash(payload: ScanCreate, db: Session = Depends(get_db)):
             if cached_data:
                 try:
                     logger.info(f"Cache hit for hash: {file_hash}")
-                    return ScanResponse(**json.loads(cached_data))
+                    return HashScanResponse(**json.loads(cached_data))
                 except Exception:
                     pass
 
@@ -51,6 +52,8 @@ async def analyze_hash(payload: ScanCreate, db: Session = Depends(get_db)):
 
             vt_res = vt_res if not isinstance(vt_res, Exception) else virustotal_service._get_fallback_data()
             otx_res = otx_res if not isinstance(otx_res, Exception) else alienvault_service._get_fallback_data(file_hash)
+            vt_res = ensure_provenance(vt_res, "VirusTotal")
+            otx_res = ensure_provenance(otx_res, "AlienVault OTX")
 
         except Exception as e:
             logger.error(f"[hash] Parallel lookups failed: {e}", exc_info=True)
@@ -68,9 +71,10 @@ async def analyze_hash(payload: ScanCreate, db: Session = Depends(get_db)):
         risk_level = risk_results["level"]
 
         raw_aggregation = {
+            "report_schema": "hash.v1",
             "virustotal": vt_res,
             "alienvault_otx": otx_res,
-            "risk_confidence": {"score": risk_results.get("confidence_score", 0), "level": risk_results.get("confidence_level", "LOW")}
+            "risk_confidence": risk_results
         }
 
         # 4. Generate AI Threat Brief — isolated, never crashes the route
@@ -84,8 +88,8 @@ async def analyze_hash(payload: ScanCreate, db: Session = Depends(get_db)):
         except Exception:
             logger.error("[hash] AI brief failed unexpectedly; using inline fallback.", exc_info=True)
             ai_brief = {
-                "summary": "AI unavailable", "threat_category": "unknown",
-                "confidence": "low", "recommendations": [], "playbook": [], "mitre_tactics": []
+                "status": "unavailable", "summary": "Not available", "threat_category": "Not available",
+                "confidence": "Not available", "recommendations": [], "playbook": [], "mitre_tactics": []
             }
 
         full_raw_data = {**raw_aggregation, "ai_insights": ai_brief}
@@ -110,7 +114,7 @@ async def analyze_hash(payload: ScanCreate, db: Session = Depends(get_db)):
             db.rollback()
             logger.error(f"[hash] Failed to record hash scan: {dbe}")
 
-        response = ScanResponse.model_validate(db_scan)
+        response = HashScanResponse.model_validate(db_scan)
 
         # 6. Cache output
         try:

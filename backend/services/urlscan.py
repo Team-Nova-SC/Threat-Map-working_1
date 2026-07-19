@@ -2,6 +2,7 @@ import logging
 import httpx
 from typing import Dict, Any
 from core.config import settings
+from services.provider_result import unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +62,6 @@ class URLScanService:
                 return self._get_fallback_data(indicator)
 
     def _get_fallback_data(self, indicator: str) -> Dict[str, Any]:
-        return {
-            "scan_id": "b3e34b9d-4e9d-4d7a-b50a-e3250b73142a",
-            "screenshot_url": "https://urlscan.io/screenshots/b3e34b9d-4e9d-4d7a-b50a-e3250b73142a.png",
-            "page_title": "Apache2 Ubuntu Default Page: It works",
-            "server": "Apache/2.4.41 (Ubuntu)",
-            "ip": "192.0.2.1",
-            "asn": "DIGITALOCEAN-ASN",
-            "overall_status": "fallback",
-            "raw": None
-        }
+        return unavailable("urlscan.io", "Provider did not return a result")
 
 urlscan_service = URLScanService()

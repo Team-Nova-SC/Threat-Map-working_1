@@ -6,6 +6,7 @@ import dns.resolver
 import whois
 from datetime import datetime
 import asyncio
+from services.provider_result import provider_result, unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class OSINTService:
             except Exception as e:
                 # Silently skip missing records
                 pass
-        return results
+        return provider_result("DNS", "success", results)
 
     async def get_whois_data(self, domain: str) -> Dict[str, Any]:
         try:
@@ -40,23 +41,15 @@ class OSINTService:
             if isinstance(expiration_date, list):
                 expiration_date = expiration_date[0]
 
-            return {
+            return provider_result("WHOIS", "success", {
                 "registrar": w.registrar or "Unknown",
                 "creation_date": creation_date.strftime("%Y-%m-%d") if isinstance(creation_date, datetime) else str(creation_date or ""),
                 "expiration_date": expiration_date.strftime("%Y-%m-%d") if isinstance(expiration_date, datetime) else str(expiration_date or ""),
                 "registrant_org": w.org or "Unknown",
-                "status": "success"
-            }
+            })
         except Exception as e:
             logger.warning(f"WHOIS query failed for {domain}: {e}")
-            # Realistic mock fallback
-            return {
-                "registrar": "NameCheap, Inc.",
-                "creation_date": "2020-03-12",
-                "expiration_date": "2027-03-12",
-                "registrant_org": "Privacy Service Provided by Withheld for Privacy ehf",
-                "status": "fallback"
-            }
+            return unavailable("WHOIS", str(e), "error")
 
     async def get_ssl_metadata(self, host: str, port: int = 443) -> Dict[str, Any]:
         context = ssl.create_default_context()
@@ -83,25 +76,25 @@ class OSINTService:
                     subject[key] = val
 
             sslsock.close()
-            return {
+            valid_to = cert.get("notAfter", "")
+            certificate_status = "valid"
+            if valid_to:
+                try:
+                    if datetime.strptime(valid_to, "%b %d %H:%M:%S %Y %Z") <= datetime.utcnow():
+                        certificate_status = "expired"
+                except ValueError:
+                    certificate_status = "unknown"
+            return provider_result("TLS certificate", "success", {
                 "issuer": issuer.get("commonName", issuer.get("organizationName", "Unknown")),
                 "subject": subject.get("commonName", "Unknown"),
                 "valid_from": cert.get("notBefore", ""),
-                "valid_to": cert.get("notAfter", ""),
+                "valid_to": valid_to,
                 "serial_number": cert.get("serialNumber", ""),
-                "version": cert.get("version", 3),
-                "status": "success"
-            }
+                "version": cert.get("version"),
+                "certificate_status": certificate_status
+            })
         except Exception as e:
             logger.warning(f"SSL handshake failed for {host}:{port}: {e}")
-            return {
-                "issuer": "Let's Encrypt Authority X3",
-                "subject": host,
-                "valid_from": "Jan  1 00:00:00 2024 GMT",
-                "valid_to": "Dec 31 23:59:59 2026 GMT",
-                "serial_number": "3F1D7A84BC09E123",
-                "version": 3,
-                "status": "fallback"
-            }
+            return unavailable("TLS certificate", str(e), "error")
 
 osint_service = OSINTService()

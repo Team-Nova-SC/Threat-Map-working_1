@@ -142,6 +142,14 @@ Respond ONLY with this JSON, no other text:
 
     def _get_fallback_brief(self, indicator: str, ind_type: str, risk_score: int,
                              vt_malicious: int = 0, abuse_score: int = 0) -> Dict[str, Any]:
+        return {
+            "status": "unavailable", "summary": "Not available",
+            "threat_category": "Not available", "recommendations": [],
+            "confidence": "Not available", "playbook": [], "mitre_tactics": []
+        }
+
+    def _legacy_fallback_brief(self, indicator: str, ind_type: str, risk_score: int,
+                               vt_malicious: int = 0, abuse_score: int = 0) -> Dict[str, Any]:
         """Rule-based fallback used when Gemini is unavailable/quota exceeded.
         Uses REAL signal values — never invents threats."""
         if vt_malicious == 0 and abuse_score < 10:

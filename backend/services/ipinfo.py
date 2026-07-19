@@ -4,6 +4,7 @@ import json
 from typing import Dict, Any
 from core.config import settings
 from core.cache import cache_service
+from services.provider_result import provider_result, unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -45,21 +46,20 @@ class IPInfoService:
                     except (ValueError, AttributeError):
                         pass
 
-                    result = {
+                    result = provider_result("IPinfo", "success", {
                         "ip": data.get("ip", ip),
-                        "city": data.get("city", "Unknown"),
-                        "region": data.get("region", "Unknown"),
-                        "country": data.get("country", "US"),
+                        "city": data.get("city"),
+                        "region": data.get("region"),
+                        "country": data.get("country"),
                         "loc": loc,
                         "lat": lat,
                         "lon": lon,
-                        "org": data.get("org", "Unknown ISP"),
-                        "asn": data.get("org", "").split(" ")[0] if "org" in data else "Unknown",
+                        "org": data.get("org"),
+                        "asn": data.get("org", "").split(" ")[0] if "org" in data else None,
                         "postal": data.get("postal", ""),
-                        "timezone": data.get("timezone", "UTC"),
-                        "status": "success",
+                        "timezone": data.get("timezone"),
                         "raw": data
-                    }
+                    })
 
                     try:
                         cache_service.set(cache_key, json.dumps(result), expire=86400)
@@ -77,13 +77,6 @@ class IPInfoService:
 
     def _get_fallback_data(self, ip: str) -> Dict[str, Any]:
         # Never invent a location when the upstream provider is unavailable.
-        return {
-            "ip": ip,
-            "city": None, "region": None, "country": None, "loc": None,
-            "lat": None, "lon": None, "org": None, "asn": None,
-            "postal": None, "timezone": None,
-            "status": "unavailable",
-            "raw": None
-        }
+        return unavailable("IPinfo", "Provider did not return a result")
 
 ipinfo_service = IPInfoService()

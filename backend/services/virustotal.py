@@ -3,6 +3,7 @@ import logging
 import httpx
 from typing import Dict, Any, Optional
 from core.config import settings
+from services.provider_result import provider_result, unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class VirusTotalService:
     async def _make_request(self, url: str) -> Dict[str, Any]:
         if not self.api_key or len(self.api_key) < 10:
             logger.warning("VT API key missing. Returning fallback data.")
-            return self._get_fallback_data()
+            return unavailable("VirusTotal", "API key is not configured")
 
         transport = httpx.AsyncHTTPTransport(local_address='0.0.0.0')
         async with httpx.AsyncClient(transport=transport, timeout=30.0) as client:
@@ -43,42 +44,25 @@ class VirusTotalService:
                     data = response.json()
                     attributes = data.get("data", {}).get("attributes", {})
                     stats = attributes.get("last_analysis_stats", {})
-                    return {
+                    return provider_result("VirusTotal", "success", {
                         "malicious": stats.get("malicious", 0),
                         "suspicious": stats.get("suspicious", 0),
                         "harmless": stats.get("harmless", 0),
                         "undetected": stats.get("undetected", 0),
                         "reputation": attributes.get("reputation", 0),
-                        "status": "success",
                         "raw": data
-                    }
+                    })
                 elif response.status_code == 404:
-                    return {
-                        "malicious": 0,
-                        "suspicious": 0,
-                        "harmless": 0,
-                        "undetected": 0,
-                        "reputation": 0,
-                        "status": "not_found",
-                        "raw": None
-                    }
+                    return provider_result("VirusTotal", "not_found", {"raw": None})
                 else:
                     logger.warning(f"VirusTotal request failed with status {response.status_code}. Returning fallback.")
-                    return self._get_fallback_data()
+                    return unavailable("VirusTotal", f"HTTP {response.status_code}", "error")
             except Exception as e:
                 logger.error(f"VirusTotal query failed: {e}. Returning fallback.")
-                return self._get_fallback_data()
+                return unavailable("VirusTotal", str(e), "error")
 
     def _get_fallback_data(self) -> Dict[str, Any]:
         # Return CLEAN zeros — API failures must never inflate risk scores
-        return {
-            "malicious": 0,
-            "suspicious": 0,
-            "harmless": 0,
-            "undetected": 0,
-            "reputation": 0,
-            "status": "fallback",
-            "raw": None
-        }
+        return unavailable("VirusTotal", "Provider did not return a result")
 
 virustotal_service = VirusTotalService()

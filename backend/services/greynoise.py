@@ -2,6 +2,7 @@ import logging
 import httpx
 from typing import Dict, Any
 from core.config import settings
+from services.provider_result import provider_result, unavailable
 
 logger = logging.getLogger(__name__)
 
@@ -23,25 +24,16 @@ class GreyNoiseService:
                 response = await client.get(url, headers=self.headers)
                 if response.status_code == 200:
                     data = response.json()
-                    return {
+                    return provider_result("GreyNoise", "success", {
                         "noise": data.get("noise", False),
                         "riot": data.get("riot", False),
                         "classification": data.get("classification", "unknown"),
                         "name": data.get("name", "Unknown Scanner"),
                         "link": data.get("link", ""),
-                        "status": "success",
                         "raw": data
-                    }
+                    })
                 elif response.status_code == 404:
-                    return {
-                        "noise": False,
-                        "riot": False,
-                        "classification": "unknown",
-                        "name": "Not Seen",
-                        "link": "",
-                        "status": "not_seen",
-                        "raw": None
-                    }
+                    return provider_result("GreyNoise", "not_found", {"raw": None})
                 else:
                     logger.warning(f"GreyNoise check failed with status {response.status_code}. Returning fallback.")
                     return self._get_fallback_data(ip)
@@ -51,14 +43,6 @@ class GreyNoiseService:
 
     def _get_fallback_data(self, ip: str) -> Dict[str, Any]:
         # Return CLEAN unknown — API failures must never inflate risk scores
-        return {
-            "noise": False,
-            "riot": False,
-            "classification": "unknown",
-            "name": "Unknown",
-            "link": "",
-            "status": "fallback",
-            "raw": None
-        }
+        return unavailable("GreyNoise", "Provider did not return a result")
 
 greynoise_service = GreyNoiseService()

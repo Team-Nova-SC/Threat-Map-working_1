@@ -1,133 +1,49 @@
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
+SUCCESS_STATUSES = {"success", "not_found", "not_seen"}
+
 
 class RiskEngine:
-    def calculate_risk(self, indicator_type: str, vt_data: Dict[str, Any], abuse_data: Dict[str, Any] = None, greynoise_data: Dict[str, Any] = None) -> Dict[str, Any]:
-        if abuse_data is None:
-            abuse_data = {}
-        if greynoise_data is None:
-            greynoise_data = {}
-            
-        score = 0
-        reasons = []
+    def calculate_risk(self, indicator_type: str, vt_data: Dict[str, Any],
+                       abuse_data: Dict[str, Any] | None = None,
+                       greynoise_data: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        abuse_data = abuse_data or {}
+        greynoise_data = greynoise_data or {}
+        components: Dict[str, Dict[str, Any]] = {}
 
-        # VirusTotal — 35% weight
-        vt_malicious = 0
-        vt_total = 0
-        try:
-            stats = vt_data.get("data", {}).get(
-                "attributes", {}).get(
-                "last_analysis_stats", {})
-            
-            # Sometimes VT data is passed as the stats directly (depending on how threat_intel.py parses it)
-            if not stats:
-                vt_malicious = vt_data.get("malicious", 0)
-                vt_total = vt_data.get("malicious", 0) + vt_data.get("harmless", 0) + vt_data.get("suspicious", 0) + vt_data.get("undetected", 0)
-            else:
-                vt_malicious = stats.get("malicious", 0)
-                vt_total = stats.get("total", 0)
-        except:
-            vt_malicious = 0
-        
-        if vt_malicious == 0:
-            vt_score = 0
-        elif vt_malicious <= 3:
-            vt_score = 25
-        elif vt_malicious <= 10:
-            vt_score = 60
-        else:
-            vt_score = 100
-        reasons.append(f"VT: {vt_malicious} detections")
+        if vt_data.get("status") in SUCCESS_STATUSES:
+            malicious = int(vt_data.get("malicious") or 0)
+            vt_score = 0 if malicious == 0 else 25 if malicious <= 3 else 60 if malicious <= 10 else 100
+            components["virustotal"] = {"score": vt_score, "weight": 35, "source": "VirusTotal", "retrieved_at": vt_data.get("retrieved_at")}
 
-        # AbuseIPDB — 40% weight  
-        abuse_score = 0
-        try:
-            abuse_score = abuse_data.get(
-                "data", {}).get("abuseConfidenceScore", 0)
-            if not abuse_score:
-                abuse_score = abuse_data.get("abuseConfidenceScore", 0)
-        except:
-            abuse_score = 0
-        reasons.append(f"Abuse: {abuse_score}%")
+        if indicator_type == "ip" and abuse_data.get("status") in SUCCESS_STATUSES:
+            components["abuseipdb"] = {"score": int(abuse_data.get("abuseConfidenceScore") or 0), "weight": 40, "source": "AbuseIPDB", "retrieved_at": abuse_data.get("retrieved_at")}
 
-        # GreyNoise — 25% weight
-        gn_score = 0
-        classification = "unknown"
-        try:
-            classification = greynoise_data.get(
-                "classification", "unknown")
-            if classification == "benign":
-                gn_score = 0
-            elif classification == "malicious":
-                gn_score = 100
-            else:
-                gn_score = 10
-        except:
-            gn_score = 0
-        reasons.append(f"GN: {classification}")
+        if indicator_type == "ip" and greynoise_data.get("status") in SUCCESS_STATUSES:
+            classification = greynoise_data.get("classification")
+            gn_score = 100 if classification == "malicious" else 0 if classification == "benign" else 10
+            components["greynoise"] = {"score": gn_score, "weight": 25, "source": "GreyNoise", "retrieved_at": greynoise_data.get("retrieved_at")}
 
-        # Weighted final score
-        final = (vt_score * 0.35) + \
-                (abuse_score * 0.40) + \
-                (gn_score * 0.25)
-        final = round(final)
-
-        # HARD CAPS — cannot be overridden
-        if vt_malicious == 0 and abuse_score < 10:
-            final = min(final, 15)
-        if vt_malicious == 0 and abuse_score == 0 \
-           and gn_score == 0:
-            final = 0
-
-        # Risk level
-        if final < 30:
-            level = "LOW"
-        elif final < 60:
-            level = "MEDIUM"
-        elif final < 80:
-            level = "HIGH"
-        else:
-            level = "CRITICAL"
-
-        # Confidence Scoring
-        apis_tried = 1 # VT always tried
-        apis_succeeded = 0
-        if vt_data and (vt_data.get("data") or vt_data.get("malicious") is not None):
-            apis_succeeded += 1
-            
-        if indicator_type == "ip":
-            apis_tried += 2
-            if abuse_data and (abuse_data.get("data") or abuse_data.get("abuseConfidenceScore") is not None):
-                apis_succeeded += 1
-            if greynoise_data and greynoise_data.get("ip") or greynoise_data.get("classification"):
-                apis_succeeded += 1
-                
-        confidence_ratio = apis_succeeded / apis_tried if apis_tried > 0 else 0
-        confidence_score = int(confidence_ratio * 100)
-        
-        if confidence_ratio >= 0.8:
-            confidence_level = "HIGH"
-        elif confidence_ratio >= 0.4:
-            confidence_level = "MEDIUM"
-        else:
-            confidence_level = "LOW"
+        total_weight = sum(item["weight"] for item in components.values())
+        final = round(sum(item["score"] * item["weight"] for item in components.values()) / total_weight) if total_weight else 0
+        level = "LOW" if final < 30 else "MEDIUM" if final < 60 else "HIGH" if final < 80 else "CRITICAL"
+        expected = 3 if indicator_type == "ip" else 1
+        provider_count = len(components)
+        confidence_score = round(provider_count / expected * 100)
+        confidence_level = "HIGH" if confidence_score >= 80 else "MEDIUM" if confidence_score >= 40 else "LOW"
 
         return {
             "score": final,
             "level": level,
-            "reasons": reasons,
-            "components": {
-                "vt_score": vt_score,
-                "abuse_score": abuse_score,
-                "greynoise_score": gn_score
-            },
-            "vt_malicious": vt_malicious,
-            "abuse_score": abuse_score,
-            "greynoise": classification,
+            "components": components,
+            "provider_count": provider_count,
+            "expected_provider_count": expected,
             "confidence_score": confidence_score,
-            "confidence_level": confidence_level
+            "confidence_level": confidence_level,
+            "method": "Weighted mean of available providers; unavailable providers are excluded.",
         }
+
 
 risk_engine = RiskEngine()
