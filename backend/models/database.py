@@ -4,7 +4,17 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from core.config import settings
 
+import os
+import shutil
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "threatmap.db")
+
 # Handle schema prefixes if Supabase is used, fallback to sqlite locally
+if os.environ.get("VERCEL"):
+    if os.path.exists(DB_PATH) and not os.path.exists("/tmp/threatmap.db"):
+        shutil.copy2(DB_PATH, "/tmp/threatmap.db")
+
 if "sqlite" in settings.DATABASE_URL:
     engine = create_engine(settings.DATABASE_URL, connect_args={"check_same_thread": False})
 else:
