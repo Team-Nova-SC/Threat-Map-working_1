@@ -21,8 +21,11 @@ class ThreatActorResponse(BaseModel):
         from_attributes = True
 
 @router.get("/", response_model=List[ThreatActorResponse])
-def get_threat_actors(db: Session = Depends(get_db)):
+async def get_threat_actors(db: Session = Depends(get_db)):
     actors = db.query(ThreatActor).order_by(ThreatActor.name).all()
+    if not actors:
+        await sync_threat_actors()
+        actors = db.query(ThreatActor).order_by(ThreatActor.name).all()
     return actors
 
 @router.post("/sync")
