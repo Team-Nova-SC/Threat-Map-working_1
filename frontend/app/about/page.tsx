@@ -81,7 +81,8 @@ export default function AboutPage() {
     { name: "Recent Searches Dropdown", what: "Quickly access past scans from a localized history.", how: "Focus search bar.", example: "Click input", expected: "Dropdown shows recent IOCs." },
     { name: "Manual Dashboard Refresh", what: "Force-refresh all dashboard telemetry widgets.", how: "Click Refresh on Dashboard.", example: "Click Refresh", expected: "Widgets reload." },
     { name: "IOC Type Auto-Detect", what: "Automatically switches scan type based on regex input matching.", how: "Type an IP in input.", example: "Type 8.8.8.8", expected: "Type switches to IP Address." },
-    { name: "Global Toast Notifications", what: "Unobtrusive floating alerts for system actions.", how: "Perform action (e.g. Copy).", example: "Click Copy", expected: "Toast appears bottom center." }
+    { name: "Global Toast Notifications", what: "Unobtrusive floating alerts for system actions.", how: "Perform action (e.g. Copy).", example: "Click Copy", expected: "Toast appears bottom center." },
+    { name: "Google Dorking (Advanced OSINT)", what: "Leverages advanced search operators to uncover exposed sensitive files, directories, and vulnerabilities.", how: "Go to Advanced OSINT → select 'Google Dorks'.", example: "site:example.com ext:env", expected: "Links to exposed .env files." }
   ];
 
   const dataSources = [

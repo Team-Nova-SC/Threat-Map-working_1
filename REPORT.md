@@ -57,7 +57,7 @@ Redis is implemented as an essential middleware. Every external API call (VirusT
 
 ---
 
-## 3. ALL 26 FEATURES — FULL DETAILS
+## 3. ALL 27 FEATURES — FULL DETAILS
 
 1. **Single IOC Scanning**
    - **What it does:** Scans individual IPs, URLs, Domains, or Hashes.
@@ -190,6 +190,11 @@ Redis is implemented as an essential middleware. Every external API call (VirusT
     - **What it does:** Automates deep-dive OSINT gathering.
     - **How it works:** Connects to a local SpiderFoot instance via its REST API.
     - **APIs:** SpiderFoot Local API.
+
+27. **Google Dorking (Advanced OSINT)**
+    - **What it does:** Leverages advanced search operators to uncover exposed sensitive files, directories, and vulnerabilities.
+    - **How it works:** Constructs targeted Google search queries for a specific domain.
+    - **APIs:** Google Search (via browser redirects).
 
 ---
 
