@@ -81,11 +81,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       icon: <span className="material-symbols-outlined text-[20px]">visibility</span>,
     },
     {
-      name: "Threat Actors",
-      href: "/threat-actors",
-      icon: <span className="material-symbols-outlined text-[20px]">groups</span>,
-    },
-    {
       name: "Campaigns",
       href: "/campaigns",
       icon: <span className="material-symbols-outlined text-[20px]">target</span>,
