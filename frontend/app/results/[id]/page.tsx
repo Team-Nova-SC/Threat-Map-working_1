@@ -299,11 +299,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
                     </span>
                   </div>
                   <p className="text-[11px] text-[#ffb4ab]/70 mb-1">{actor.country || "Unknown Origin"}</p>
-                  <p className="text-[11px] text-on-surface-variant/80 line-clamp-2">{actor.description?.substring(0, 180)}...</p>
                 </div>
-                <Link href="/threat-actors" className="shrink-0 text-[10px] font-bold text-[#ffb4ab] hover:text-white border border-[#ffb4ab]/20 hover:border-[#ffb4ab]/50 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap">
-                  VIEW PROFILE →
-                </Link>
               </div>
             ))}
           </div>
