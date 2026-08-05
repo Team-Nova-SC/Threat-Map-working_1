@@ -1,74 +1,18 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import React from "react";
 import { ScanResponse } from "@/types";
 import DetectionCard from "@/components/DetectionCard";
 
-export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
-  const [data, setData] = useState<any>({
-    whois: null,
-    ssl: null,
-    ports: null,
-    reverseDns: null,
-    asn: null,
-    subdomains: null,
-    dns: null,
-    shodan: null,
-    darkweb: null,
-    webvulns: null,
-    techStack: null,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchOsint() {
-      setLoading(true);
-      const indicator = scan.indicator;
-      const type = scan.type;
-      
-      const newData = { ...data };
-
-      try {
-        // Run lookups in parallel based on indicator type
-        const promises = [];
-
-        if (type === "ip") {
-          promises.push(api.getReverseDns(indicator).then(r => newData.reverseDns = r));
-          promises.push(api.getPorts(indicator).then(r => newData.ports = r));
-          promises.push(api.getAsnDetails(indicator).then(r => newData.asn = r));
-          promises.push(api.getSsl(indicator).then(r => newData.ssl = r));
-          promises.push(api.getShodan(indicator).then(r => newData.shodan = r));
-        } else if (type === "domain" || type === "url") {
-          let domain = indicator;
-          if (type === "url") {
-            try {
-              domain = new URL(indicator).hostname;
-            } catch (e) {
-              // fallback
-            }
-          }
-          
-          promises.push(api.getWhois(domain).then(r => newData.whois = r));
-          promises.push(api.getSsl(domain).then(r => newData.ssl = r));
-          promises.push(api.getSubdomains(domain).then(r => newData.subdomains = r));
-          promises.push(api.getDnsRecords(domain).then(r => newData.dns = r));
-          promises.push(api.getDarkWeb(domain).then(r => newData.darkweb = r));
-          promises.push(api.getWebVulns(domain).then(r => newData.webvulns = r));
-          promises.push(api.getTechStack(domain).then(r => newData.techStack = r));
-        }
-
-        await Promise.allSettled(promises);
-        setData(newData);
-      } catch (e) {
-        console.error("OSINT fetch error", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchOsint();
-  }, [scan.indicator, scan.type]);
+export default function AdvancedOsintPanels({ 
+  scan, 
+  data, 
+  loading 
+}: { 
+  scan: ScanResponse, 
+  data: any, 
+  loading: boolean 
+}) {
 
 
   if (loading) {

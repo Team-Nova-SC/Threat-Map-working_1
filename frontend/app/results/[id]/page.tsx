@@ -60,6 +60,12 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
   const [isSavingDrive, setIsSavingDrive] = useState(false);
 
+  const [osintData, setOsintData] = useState<any>({
+    whois: null, ssl: null, ports: null, reverseDns: null, asn: null,
+    subdomains: null, dns: null, shodan: null, darkweb: null, webvulns: null, techStack: null
+  });
+  const [osintLoading, setOsintLoading] = useState(false);
+
   useEffect(() => {
     async function fetchReport() {
       try {
@@ -88,6 +94,51 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
     // Pre-fetch campaigns for the modal
     api.getCampaigns().then(setCampaigns).catch(console.error);
   }, [id]);
+
+  useEffect(() => {
+    if (!scan) return;
+    let isMounted = true;
+    async function fetchOsint() {
+      setOsintLoading(true);
+      const indicator = scan!.indicator;
+      const type = scan!.type;
+      const newData = {
+        whois: null, ssl: null, ports: null, reverseDns: null, asn: null,
+        subdomains: null, dns: null, shodan: null, darkweb: null, webvulns: null, techStack: null
+      };
+
+      try {
+        const promises = [];
+        if (type === "ip") {
+          promises.push(api.getReverseDns(indicator).then(r => { if(isMounted) newData.reverseDns = r }));
+          promises.push(api.getPorts(indicator).then(r => { if(isMounted) newData.ports = r }));
+          promises.push(api.getAsnDetails(indicator).then(r => { if(isMounted) newData.asn = r }));
+          promises.push(api.getSsl(indicator).then(r => { if(isMounted) newData.ssl = r }));
+          promises.push(api.getShodan(indicator).then(r => { if(isMounted) newData.shodan = r }));
+        } else if (type === "domain" || type === "url") {
+          let domain = indicator;
+          if (type === "url") {
+            try { domain = new URL(indicator).hostname; } catch (e) {}
+          }
+          promises.push(api.getWhois(domain).then(r => { if(isMounted) newData.whois = r }));
+          promises.push(api.getSsl(domain).then(r => { if(isMounted) newData.ssl = r }));
+          promises.push(api.getSubdomains(domain).then(r => { if(isMounted) newData.subdomains = r }));
+          promises.push(api.getDnsRecords(domain).then(r => { if(isMounted) newData.dns = r }));
+          promises.push(api.getDarkWeb(domain).then(r => { if(isMounted) newData.darkweb = r }));
+          promises.push(api.getWebVulns(domain).then(r => { if(isMounted) newData.webvulns = r }));
+          promises.push(api.getTechStack(domain).then(r => { if(isMounted) newData.techStack = r }));
+        }
+        await Promise.allSettled(promises);
+        if (isMounted) setOsintData(newData);
+      } catch (e) {
+        console.error("OSINT fetch error", e);
+      } finally {
+        if (isMounted) setOsintLoading(false);
+      }
+    }
+    fetchOsint();
+    return () => { isMounted = false; };
+  }, [scan]);
 
   // Separately fetch web vuln data after scan loads
   useEffect(() => {
@@ -791,7 +842,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       </div>
 
       {/* Advanced Live OSINT Telemetry */}
-      <AdvancedOsintPanels scan={scan} />
+      <AdvancedOsintPanels scan={scan} data={osintData} loading={osintLoading} />
 
       {/* DomainScan Analytics */}
       {scan.raw_data?.domainscan && (
@@ -1000,21 +1051,143 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               })()}
             </div>
           )}
-          {activeTab === "graph" && (
-            <RelationshipGraph
-              nodes={[
-                { id: scan!.id, label: scan!.indicator, type: "ioc", risk: scan!.risk_score },
-                ...((scan as any)?.correlation?.asn_matches || []).map((m: any) => ({ id: m.scan_id + "_asn", label: m.org || "ASN", type: "asn" as const })),
-                ...((scan as any)?.correlation?.subnet_matches || []).slice(0, 8).map((m: any) => ({ id: m.scan_id, label: m.indicator, type: "ioc" as const, risk: m.risk_score })),
-                ...(scan!.linked_actors || []).map(a => ({ id: a.name, label: a.name, type: "actor" as const })),
-              ]}
-              edges={[
-                ...((scan as any)?.correlation?.asn_matches || []).map((m: any) => ({ from: scan!.id, to: m.scan_id + "_asn", label: "same ASN" })),
-                ...((scan as any)?.correlation?.subnet_matches || []).slice(0, 8).map((m: any) => ({ from: scan!.id, to: m.scan_id, label: "/24" })),
-                ...(scan!.linked_actors || []).map(a => ({ from: a.name, to: scan!.id, label: "attributed" })),
-              ]}
-            />
-          )}
+          {activeTab === "graph" && (() => {
+            // Build Dynamic Graph Data
+            const nodes: any[] = [];
+            const edges: any[] = [];
+
+            // 1. Central Indicator Node
+            nodes.push({ id: scan!.indicator, label: scan!.indicator, type: "ioc", risk: scan!.risk_score });
+
+            // 2. Correlation Data (Existing)
+            ((scan as any)?.correlation?.asn_matches || []).forEach((m: any) => {
+              nodes.push({ id: m.scan_id + "_asn", label: m.org || "ASN", type: "asn" });
+              edges.push({ from: scan!.indicator, to: m.scan_id + "_asn", label: "same ASN" });
+            });
+            ((scan as any)?.correlation?.subnet_matches || []).slice(0, 8).forEach((m: any) => {
+              nodes.push({ id: m.scan_id, label: m.indicator, type: "ioc", risk: m.risk_score });
+              edges.push({ from: scan!.indicator, to: m.scan_id, label: "/24" });
+            });
+            (scan!.linked_actors || []).forEach(a => {
+              nodes.push({ id: a.name, label: a.name, type: "actor" });
+              edges.push({ from: a.name, to: scan!.indicator, label: "attributed" });
+            });
+
+            // 3. Dynamic OSINT Data
+            // ASN
+            if (osintData.asn?.asn) {
+              nodes.push({ id: osintData.asn.asn, label: osintData.asn.org_name || osintData.asn.asn, type: "asn" });
+              edges.push({ from: scan!.indicator, to: osintData.asn.asn, label: "belongs to" });
+            }
+            // Country
+            if (osintData.asn?.country || scan!.raw_data?.ipinfo?.country) {
+              const country = osintData.asn?.country || scan!.raw_data?.ipinfo?.country;
+              if (country) {
+                nodes.push({ id: country, label: country, type: "country" });
+                edges.push({ from: scan!.indicator, to: country, label: "located in" });
+              }
+            }
+            // Subdomains
+            if (osintData.subdomains?.subdomains) {
+              osintData.subdomains.subdomains.slice(0, 10).forEach((sub: string) => {
+                const fullSub = `${sub}.${scan!.indicator}`;
+                nodes.push({ id: fullSub, label: fullSub, type: "subnet" });
+                edges.push({ from: scan!.indicator, to: fullSub, label: "subdomain" });
+              });
+            }
+            // Ports
+            if (osintData.ports?.open_ports) {
+              osintData.ports.open_ports.forEach((p: any) => {
+                const portId = `port_${p.port}`;
+                if (!nodes.find(n => n.id === portId)) {
+                    nodes.push({ id: portId, label: `Port ${p.port}`, type: "service" });
+                    edges.push({ from: scan!.indicator, to: portId, label: String(p.service || "open") });
+                }
+              });
+            }
+
+            return (
+              <div className="flex flex-col lg:flex-row min-h-[500px]">
+                {/* Left Side: Graph */}
+                <div className="flex-1 relative border-r border-white/5">
+                  <RelationshipGraph nodes={nodes} edges={edges} />
+                </div>
+
+                {/* Right Side: UI Explainer Panel */}
+                <div className="w-full lg:w-[350px] p-6 bg-surface-container-low/30 overflow-y-auto">
+                  <h3 className="font-bold text-md text-white flex items-center gap-2 mb-4">
+                    <span className="material-symbols-outlined text-primary">hub</span>
+                    Graph Explorer
+                  </h3>
+                  
+                  <p className="text-xs text-on-surface-variant leading-relaxed mb-6">
+                    This interactive graph visualizes the footprint and blast radius of this target by linking it to connected infrastructure.
+                  </p>
+
+                  {osintLoading ? (
+                    <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                        <span className="text-xs text-primary font-bold">Deep Scan In Progress...</span>
+                      </div>
+                      <p className="text-[10px] text-on-surface-variant mt-2">
+                        Fetching subdomains, open ports, and live telemetry to populate this graph.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mb-6 p-4 bg-success/10 border border-success/20 rounded-lg">
+                      <div className="flex items-center gap-2 text-success mb-1">
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span className="text-xs font-bold">Telemetry Loaded</span>
+                      </div>
+                      <p className="text-[10px] text-success/70">
+                        Graph populated with {nodes.length} nodes and {edges.length} connections.
+                      </p>
+                    </div>
+                  )}
+
+                  <h4 className="text-[11px] font-mono-sm uppercase text-on-surface-variant font-bold mb-3">Node Types</h4>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <div className="w-3 h-3 rounded-full bg-error mt-0.5"></div>
+                      <div>
+                        <span className="text-xs text-white font-bold block">Target (IOC)</span>
+                        <span className="text-[10px] text-on-surface-variant">The main IP, Domain, or URL being analyzed.</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-3 h-3 rounded-full bg-blue-500 mt-0.5"></div>
+                      <div>
+                        <span className="text-xs text-white font-bold block">Network / ASN</span>
+                        <span className="text-[10px] text-on-surface-variant">The organization or ISP hosting the infrastructure.</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500 mt-0.5"></div>
+                      <div>
+                        <span className="text-xs text-white font-bold block">Country</span>
+                        <span className="text-[10px] text-on-surface-variant">Geographic location of the target.</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-3 h-3 rounded-full bg-purple-500 mt-0.5"></div>
+                      <div>
+                        <span className="text-xs text-white font-bold block">Subdomain</span>
+                        <span className="text-[10px] text-on-surface-variant">Other connected domains hosted in the same zone.</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-3 h-3 rounded-full bg-emerald-500 mt-0.5"></div>
+                      <div>
+                        <span className="text-xs text-white font-bold block">Services / Ports</span>
+                        <span className="text-[10px] text-on-surface-variant">Open doors and technologies detected on the server.</span>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            );
+          })()}
           {activeTab === "notes" && scan && (
             <CommunityNotes indicator={scan.indicator} />
           )}
