@@ -469,13 +469,40 @@ async def enumerate_dns_records(domain: str):
         return {"domain": domain, "records": {}, "status": "error", "detail": str(e)}
 
 # ─────────────────────────────────────────
-# 11. SHODAN INTEGRATION (MOCK)
+# 11. SHODAN INTEGRATION
 # ─────────────────────────────────────────
 @router.get("/shodan/{ip}")
 async def shodan_lookup(ip: str):
-    """Shodan is unavailable until a real provider integration is configured."""
-    from services.provider_result import unavailable
-    return unavailable("Shodan", "Provider integration is not configured")
+    import httpx
+    from core.config import settings
+    from services.provider_result import provider_result, unavailable
+
+    if not getattr(settings, "SHODAN_API_KEY", None):
+        return unavailable("Shodan", "Shodan API Key is not configured")
+
+    url = f"https://api.shodan.io/shodan/host/{ip}?key={settings.SHODAN_API_KEY}"
+    transport = httpx.AsyncHTTPTransport(local_address='0.0.0.0')
+    async with httpx.AsyncClient(transport=transport, timeout=10.0) as client:
+        try:
+            response = await client.get(url)
+            if response.status_code == 200:
+                data = response.json()
+                return provider_result("Shodan", "success", {
+                    "ip_str": data.get("ip_str"),
+                    "org": data.get("org", "Unknown"),
+                    "os": data.get("os", "Unknown"),
+                    "ports": data.get("ports", []),
+                    "vulns": data.get("vulns", []),
+                    "hostnames": data.get("hostnames", []),
+                    "last_update": data.get("last_update", ""),
+                    "raw": data
+                })
+            elif response.status_code == 404:
+                return provider_result("Shodan", "not_found", {"raw": None})
+            else:
+                return unavailable("Shodan", f"Provider failed with status {response.status_code}")
+        except Exception as e:
+            return unavailable("Shodan", str(e), "error")
 
 # ─────────────────────────────────────────
 # 12. DARK WEB MENTIONS (MOCK)

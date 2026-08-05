@@ -145,7 +145,7 @@ export default function Home() {
         </motion.h1>
         <p className="text-sm md:text-base text-on-surface-variant max-w-2xl mx-auto font-body-lg leading-relaxed px-2 md:px-0">
           Aggregates IP geolocation, malicious binary signals, domain DNS mapping, and URL scan screenshots
-          into a single, consolidated threat score supported by automated Google Gemini mitigation reports.
+          into a single, consolidated threat score supported by automated Groq AI mitigation reports.
         </p>
       </div>
 

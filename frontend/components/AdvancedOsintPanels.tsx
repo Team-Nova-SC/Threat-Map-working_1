@@ -98,7 +98,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
           <DetectionCard
             title="Attack Surface (Shodan)"
             subtitle="Known vulnerabilities & exposed services on this IP"
-            status={data.shodan?.status === "success" ? (data.shodan?.vulns?.length > 0 ? "VULNERABLE" : "No findings") : "Not available"}
+            status={data.shodan?.status === "success" ? (data.shodan?.vulns?.length > 0 ? "VULNERABLE" : "Analyzed") : (data.shodan?.status === "not_found" ? "No Shodan history for this host" : "Not available")}
             isMalicious={data.shodan?.vulns?.length > 0}
             iconName="radar"
           >
@@ -106,7 +106,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${data.shodan?.vulns?.length ? 'bg-error animate-ping' : 'bg-success'}`}></div>
-                  <span>CVEs Found: {data.shodan?.status === "success" ? (data.shodan?.vulns?.length || 0) : "Not available"}</span>
+                  <span>CVEs Found: {data.shodan?.status === "success" ? (data.shodan?.vulns?.length || 0) : (data.shodan?.status === "not_found" ? "None" : "Not available")}</span>
                 </div>
                 {data.shodan?.vulns?.length > 0 && (
                   <div className="flex gap-1 flex-wrap">
@@ -115,8 +115,20 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
                     ))}
                   </div>
                 )}
-                <div className="mt-1 border-t border-white/10 pt-1">
-                  <span className="text-white/50 text-[9px]">Server OS:</span> {data.shodan?.os || "Unknown"}
+                {data.shodan?.ports?.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-1">
+                    <span className="text-white/50 text-[9px] mr-1">Ports:</span>
+                    {data.shodan?.ports.map((p: any) => (
+                      <span key={p} className="bg-primary/20 text-primary px-1 py-0.5 rounded text-[8px]">{p}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-1 border-t border-white/10 pt-1 flex flex-col gap-1">
+                  <div><span className="text-white/50 text-[9px]">Server OS:</span> {data.shodan?.status === "not_found" ? "N/A" : (data.shodan?.os || "Unknown")}</div>
+                  <div><span className="text-white/50 text-[9px]">Org:</span> {data.shodan?.status === "not_found" ? "N/A" : (data.shodan?.org || "Unknown")}</div>
+                  {data.shodan?.last_update && (
+                    <div><span className="text-white/50 text-[9px]">Last Update:</span> {new Date(data.shodan.last_update).toLocaleDateString()}</div>
+                  )}
                 </div>
               </div>
             </div>

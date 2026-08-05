@@ -503,55 +503,69 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
           )}
         </div>
 
-        {/* Cell 2: Gemini AI Brief */}
+        {/* Cell 2: AI Analyst Brief */}
         <div className="md:col-span-2 glass-panel p-lg rounded-xl flex flex-col justify-between min-h-[300px]">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-white/5 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[20px]">psychology</span>
-                <h3 className="font-bold text-white text-md font-headline-sm">Gemini Analyst Brief</h3>
-              </div>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono-sm font-bold bg-primary/10 text-primary border border-primary/20">
-                AI Confidence: {ai.confidence || "HIGH"}
-              </span>
-            </div>
-            <div>
-              <p className="text-[11px] font-mono-sm uppercase text-primary font-bold mb-1">
-                Category: {ai.threat_category || "Botnet C2"}
-              </p>
-              <p className="text-sm text-on-surface leading-relaxed">{scan.summary}</p>
-            </div>
-            {ai.playbook && ai.playbook.length > 0 ? (
-              <div className="mt-4 border-t border-white/5 pt-4">
-                <p className="text-[11px] font-mono-sm uppercase text-error font-bold mb-3 flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[14px]">local_police</span>
-                  Incident Remediation Playbook
+          {ai.status === "unavailable" ? (
+            <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
+              <span className="material-symbols-outlined text-[48px] text-on-surface-variant/40">error</span>
+              <div>
+                <h3 className="font-bold text-white text-md">AI Analysis Unavailable</h3>
+                <p className="text-sm text-on-surface-variant max-w-sm mt-1">
+                  The AI service is currently unreachable or quota exceeded. Please rely on the raw indicators.
                 </p>
-                <div className="space-y-2">
-                  {ai.playbook.map((step: string, idx: number) => (
-                    <div key={idx} className="flex items-start gap-2 text-xs bg-error/10 border border-error/20 p-2 rounded-lg">
-                      <div className="w-5 h-5 rounded-full bg-error/20 flex items-center justify-center shrink-0 mt-0.5">
-                        <span className="text-error font-bold text-[10px]">{idx + 1}</span>
-                      </div>
-                      <span className="text-error/90 leading-relaxed mt-0.5">{step.replace(/^\d+\.\s*/, '')}</span>
-                    </div>
-                  ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[20px]">psychology</span>
+                    <h3 className="font-bold text-white text-md font-headline-sm">AI Analyst Brief</h3>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono-sm font-bold bg-primary/10 text-primary border border-primary/20">
+                    AI Confidence: {ai.confidence || "HIGH"}
+                  </span>
                 </div>
+                <div>
+                  <p className="text-[11px] font-mono-sm uppercase text-primary font-bold mb-1">
+                    Category: {ai.threat_category || "Unknown"}
+                  </p>
+                  <p className="text-sm text-on-surface leading-relaxed">{scan.summary || ai.summary}</p>
+                </div>
+                {ai.playbook && ai.playbook.length > 0 ? (
+                  <div className="mt-4 border-t border-white/5 pt-4">
+                    <p className="text-[11px] font-mono-sm uppercase text-error font-bold mb-3 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[14px]">local_police</span>
+                      Incident Remediation Playbook
+                    </p>
+                    <div className="space-y-2">
+                      {ai.playbook.map((step: string, idx: number) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs bg-error/10 border border-error/20 p-2 rounded-lg">
+                          <div className="w-5 h-5 rounded-full bg-error/20 flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="text-error font-bold text-[10px]">{idx + 1}</span>
+                          </div>
+                          <span className="text-error/90 leading-relaxed mt-0.5">{step.replace(/^\d+\.\s*/, '')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : ai.recommendations ? (
+                  <div className="mt-4 border-t border-white/5 pt-4">
+                    <p className="text-[11px] font-mono-sm uppercase text-error font-bold mb-1">
+                      Mitigation Plan
+                    </p>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      {Array.isArray(ai.recommendations) ? ai.recommendations.join(" ") : ai.recommendations}
+                    </p>
+                  </div>
+                ) : null}
               </div>
-            ) : ai.recommendations ? (
-              <div className="mt-4 border-t border-white/5 pt-4">
-                <p className="text-[11px] font-mono-sm uppercase text-error font-bold mb-1">
-                  Mitigation Plan
-                </p>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  {ai.recommendations}
-                </p>
+              <div className="text-[10px] text-on-surface-variant/60 font-mono-sm mt-4 text-right">
+                Generated via Groq - Structured Mode
               </div>
-            ) : null}
-          </div>
-          <div className="text-[10px] text-on-surface-variant/60 font-mono-sm mt-4 text-right">
-            Generated via Gemini 1.5 Flash - Structured Mode
-          </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -641,18 +655,18 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             <DetectionCard
               title="GreyNoise"
               subtitle="Internet background noise check"
-              status={providerValue(gn, gn.classification || "Not available") as string}
+              status={gn.status === "not_found" ? "Not classified by GreyNoise" : (providerValue(gn, gn.classification || "Not available") as string)}
               isMalicious={gn.classification === "malicious"}
               iconName="hearing"
             >
               <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
                 <div className="flex justify-between">
                   <span>Known Scanner:</span>
-                  <span className="text-white font-bold">{gn.noise ? "YES" : "NO"}</span>
+                  <span className="text-white font-bold">{gn.status === "not_found" ? "NO" : (gn.noise ? "YES" : "NO")}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Scanner Name:</span>
-                  <span className="text-white">{gn.name || "N/A"}</span>
+                  <span className="text-white">{gn.status === "not_found" ? "N/A" : (gn.name || "N/A")}</span>
                 </div>
               </div>
             </DetectionCard>
