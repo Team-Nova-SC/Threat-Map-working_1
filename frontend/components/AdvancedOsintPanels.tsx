@@ -45,6 +45,9 @@ export default function AdvancedOsintPanels({
             status={data.shodan?.status === "success" ? (data.shodan?.vulns?.length > 0 ? "VULNERABLE" : "Analyzed") : (data.shodan?.status === "not_found" ? "No Shodan history for this host" : "Not available")}
             isMalicious={data.shodan?.vulns?.length > 0}
             iconName="radar"
+            vendorLink={`https://www.shodan.io/host/${scan.indicator}`}
+            timestamp={data.shodan?.last_update || undefined}
+            rawJson={data.shodan}
           >
             <div className="text-[10px] font-mono-sm space-y-1 text-on-surface-variant mt-2">
               <div className="flex flex-col gap-2">
