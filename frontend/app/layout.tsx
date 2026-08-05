@@ -23,7 +23,7 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "ThreatMap - AI Threat Intelligence & OSINT Aggregation Platform",
   description:
-    "Aggregates data from VirusTotal, AbuseIPDB, IPinfo, AlienVault, GreyNoise, and Google Gemini AI to analyze IPs, URLs, domains, and file hashes.",
+    "Aggregates data from VirusTotal, AbuseIPDB, IPinfo, AlienVault, GreyNoise, and Groq AI to analyze IPs, URLs, domains, and file hashes.",
 };
 
 export default function RootLayout({

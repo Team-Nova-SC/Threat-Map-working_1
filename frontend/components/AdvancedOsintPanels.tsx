@@ -1,74 +1,18 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import React from "react";
 import { ScanResponse } from "@/types";
 import DetectionCard from "@/components/DetectionCard";
 
-export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
-  const [data, setData] = useState<any>({
-    whois: null,
-    ssl: null,
-    ports: null,
-    reverseDns: null,
-    asn: null,
-    subdomains: null,
-    dns: null,
-    shodan: null,
-    darkweb: null,
-    webvulns: null,
-    techStack: null,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchOsint() {
-      setLoading(true);
-      const indicator = scan.indicator;
-      const type = scan.type;
-      
-      const newData = { ...data };
-
-      try {
-        // Run lookups in parallel based on indicator type
-        const promises = [];
-
-        if (type === "ip") {
-          promises.push(api.getReverseDns(indicator).then(r => newData.reverseDns = r));
-          promises.push(api.getPorts(indicator).then(r => newData.ports = r));
-          promises.push(api.getAsnDetails(indicator).then(r => newData.asn = r));
-          promises.push(api.getSsl(indicator).then(r => newData.ssl = r));
-          promises.push(api.getShodan(indicator).then(r => newData.shodan = r));
-        } else if (type === "domain" || type === "url") {
-          let domain = indicator;
-          if (type === "url") {
-            try {
-              domain = new URL(indicator).hostname;
-            } catch (e) {
-              // fallback
-            }
-          }
-          
-          promises.push(api.getWhois(domain).then(r => newData.whois = r));
-          promises.push(api.getSsl(domain).then(r => newData.ssl = r));
-          promises.push(api.getSubdomains(domain).then(r => newData.subdomains = r));
-          promises.push(api.getDnsRecords(domain).then(r => newData.dns = r));
-          promises.push(api.getDarkWeb(domain).then(r => newData.darkweb = r));
-          promises.push(api.getWebVulns(domain).then(r => newData.webvulns = r));
-          promises.push(api.getTechStack(domain).then(r => newData.techStack = r));
-        }
-
-        await Promise.allSettled(promises);
-        setData(newData);
-      } catch (e) {
-        console.error("OSINT fetch error", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchOsint();
-  }, [scan.indicator, scan.type]);
+export default function AdvancedOsintPanels({ 
+  scan, 
+  data, 
+  loading 
+}: { 
+  scan: ScanResponse, 
+  data: any, 
+  loading: boolean 
+}) {
 
 
   if (loading) {
@@ -98,7 +42,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
           <DetectionCard
             title="Attack Surface (Shodan)"
             subtitle="Known vulnerabilities & exposed services on this IP"
-            status={data.shodan?.status === "success" ? (data.shodan?.vulns?.length > 0 ? "VULNERABLE" : "No findings") : "Not available"}
+            status={data.shodan?.status === "success" ? (data.shodan?.vulns?.length > 0 ? "VULNERABLE" : "Analyzed") : (data.shodan?.status === "not_found" ? "No Shodan history for this host" : "Not available")}
             isMalicious={data.shodan?.vulns?.length > 0}
             iconName="radar"
           >
@@ -106,7 +50,7 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${data.shodan?.vulns?.length ? 'bg-error animate-ping' : 'bg-success'}`}></div>
-                  <span>CVEs Found: {data.shodan?.status === "success" ? (data.shodan?.vulns?.length || 0) : "Not available"}</span>
+                  <span>CVEs Found: {data.shodan?.status === "success" ? (data.shodan?.vulns?.length || 0) : (data.shodan?.status === "not_found" ? "None" : "Not available")}</span>
                 </div>
                 {data.shodan?.vulns?.length > 0 && (
                   <div className="flex gap-1 flex-wrap">
@@ -115,8 +59,20 @@ export default function AdvancedOsintPanels({ scan }: { scan: ScanResponse }) {
                     ))}
                   </div>
                 )}
-                <div className="mt-1 border-t border-white/10 pt-1">
-                  <span className="text-white/50 text-[9px]">Server OS:</span> {data.shodan?.os || "Unknown"}
+                {data.shodan?.ports?.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-1">
+                    <span className="text-white/50 text-[9px] mr-1">Ports:</span>
+                    {data.shodan?.ports.map((p: any) => (
+                      <span key={p} className="bg-primary/20 text-primary px-1 py-0.5 rounded text-[8px]">{p}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-1 border-t border-white/10 pt-1 flex flex-col gap-1">
+                  <div><span className="text-white/50 text-[9px]">Server OS:</span> {data.shodan?.status === "not_found" ? "N/A" : (data.shodan?.os || "Unknown")}</div>
+                  <div><span className="text-white/50 text-[9px]">Org:</span> {data.shodan?.status === "not_found" ? "N/A" : (data.shodan?.org || "Unknown")}</div>
+                  {data.shodan?.last_update && (
+                    <div><span className="text-white/50 text-[9px]">Last Update:</span> {new Date(data.shodan.last_update).toLocaleDateString()}</div>
+                  )}
                 </div>
               </div>
             </div>

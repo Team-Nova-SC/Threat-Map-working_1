@@ -21,7 +21,7 @@ class RiskEngine:
         if indicator_type == "ip" and abuse_data.get("status") in SUCCESS_STATUSES:
             components["abuseipdb"] = {"score": int(abuse_data.get("abuseConfidenceScore") or 0), "weight": 40, "source": "AbuseIPDB", "retrieved_at": abuse_data.get("retrieved_at")}
 
-        if indicator_type == "ip" and greynoise_data.get("status") in SUCCESS_STATUSES:
+        if indicator_type == "ip" and greynoise_data.get("status") == "success":
             classification = greynoise_data.get("classification")
             gn_score = 100 if classification == "malicious" else 0 if classification == "benign" else 10
             components["greynoise"] = {"score": gn_score, "weight": 25, "source": "GreyNoise", "retrieved_at": greynoise_data.get("retrieved_at")}
