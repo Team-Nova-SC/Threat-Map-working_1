@@ -669,7 +669,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             isMalicious={vt.malicious > 0}
             iconName="security"
             vendorLink={scan.type !== 'url' ? `https://www.virustotal.com/gui/${scan.type === 'ip' ? 'ip-address' : 'domain'}/${scan.indicator}` : undefined}
-            timestamp={scan.scanned_at}
+            timestamp={scan.created_at}
             rawJson={scan.raw_data?.vt}
           >
             <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
@@ -693,7 +693,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               isMalicious={abuse.abuseConfidenceScore > 0}
               iconName="gpp_bad"
               vendorLink={`https://www.abuseipdb.com/check/${scan.indicator}`}
-              timestamp={scan.scanned_at}
+              timestamp={scan.created_at}
               rawJson={scan.raw_data?.abuse}
             >
               <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
@@ -718,7 +718,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               isMalicious={gn.classification === "malicious"}
               iconName="hearing"
               vendorLink={`https://viz.greynoise.io/ip/${scan.indicator}`}
-              timestamp={scan.scanned_at}
+              timestamp={scan.created_at}
               rawJson={scan.raw_data?.greynoise}
             >
               <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
