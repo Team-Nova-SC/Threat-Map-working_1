@@ -1,4 +1,4 @@
-# ThreatMap: Comprehensive Threat Intelligence and Analysis Platform Report
+# ThreatMap: Advanced OSINT & AI-Powered Threat Intelligence Platform
 
 ## 1. PROJECT OVERVIEW
 
