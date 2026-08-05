@@ -375,7 +375,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             </span>
             <RiskBadge level={scan.risk_level} />
             {scan.raw_data?.risk_confidence && (
-                <span className={`px-2 py-0.5 rounded text-[10px] font-mono-sm font-bold border ${
+                <span 
+                  title="Confidence score represents the reliability of this risk rating. It is calculated by weighing the number of successful vendor data sources (VirusTotal, AbuseIPDB, GreyNoise) against their expected contributions."
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono-sm font-bold border ${
                     scan.raw_data.risk_confidence.level === "HIGH" ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" :
                     scan.raw_data.risk_confidence.level === "MEDIUM" ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" :
                     "text-error bg-error/10 border-error/20"
@@ -666,6 +668,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             status={providerValue(vt, `${vt.malicious || 0} / ${(vt.malicious || 0) + (vt.harmless || 0)} flags`) as string}
             isMalicious={vt.malicious > 0}
             iconName="security"
+            vendorLink={scan.type !== 'url' ? `https://www.virustotal.com/gui/${scan.type === 'ip' ? 'ip-address' : 'domain'}/${scan.indicator}` : undefined}
+            timestamp={scan.scanned_at}
+            rawJson={scan.raw_data?.vt}
           >
             <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
               <div className="flex justify-between">
@@ -687,6 +692,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               status={providerValue(abuse, `${abuse.abuseConfidenceScore || 0}% abuse`) as string}
               isMalicious={abuse.abuseConfidenceScore > 0}
               iconName="gpp_bad"
+              vendorLink={`https://www.abuseipdb.com/check/${scan.indicator}`}
+              timestamp={scan.scanned_at}
+              rawJson={scan.raw_data?.abuse}
             >
               <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
                 <div className="flex justify-between">
@@ -709,6 +717,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               status={gn.status === "not_found" ? "Not classified by GreyNoise" : (providerValue(gn, gn.classification || "Not available") as string)}
               isMalicious={gn.classification === "malicious"}
               iconName="hearing"
+              vendorLink={`https://viz.greynoise.io/ip/${scan.indicator}`}
+              timestamp={scan.scanned_at}
+              rawJson={scan.raw_data?.greynoise}
             >
               <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
                 <div className="flex justify-between">
@@ -1110,6 +1121,15 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               <div className="flex flex-col lg:flex-row min-h-[500px]">
                 {/* Left Side: Graph */}
                 <div className="flex-1 relative border-r border-white/5">
+                  {!osintLoading && nodes.length === 1 && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center p-6 bg-black/60 backdrop-blur-sm pointer-events-none">
+                      <span className="material-symbols-outlined text-[48px] text-on-surface-variant/50 mb-4">share_off</span>
+                      <h4 className="text-white font-bold text-lg mb-2">No Connected Infrastructure</h4>
+                      <p className="text-sm text-on-surface-variant max-w-md">
+                        The deep scan completed but did not find any linked subdomains, ASNs, or open ports for this target.
+                      </p>
+                    </div>
+                  )}
                   <RelationshipGraph nodes={nodes} edges={edges} />
                 </div>
 
