@@ -11,9 +11,12 @@ from services.virustotal import virustotal_service
 from services.urlscan import urlscan_service
 from services.alienvault import alienvault_service
 from services.risk_engine import risk_engine
+from services.risk_engine import risk_engine
 from services.ai_service import ai_service
 from services.provider_result import unavailable
 from services.provider_result import ensure_provenance
+from services.domainscan import domainscan_service
+from services.whoisjson import whoisjson_service
 import urllib.parse
 
 logger = logging.getLogger(__name__)
@@ -43,14 +46,24 @@ async def analyze_url(payload: ScanCreate, db: Session = Depends(get_db)):
             vt_task = asyncio.wait_for(virustotal_service.get_url_report(target_url), timeout=30.0)
             urlscan_task = asyncio.wait_for(urlscan_service.search_indicator(target_url, "url"), timeout=8.0)
             otx_task = asyncio.wait_for(alienvault_service.get_indicator_report(target_url, "url"), timeout=8.0)
-            vt_res, urlscan_res, otx_res = await asyncio.gather(
-                vt_task, urlscan_task, otx_task,
+            
+            parsed = urllib.parse.urlparse(target_url)
+            domain_for_scan = parsed.hostname or target_url
+            
+            domainscan_task = asyncio.wait_for(domainscan_service.get_scan_data(domain_for_scan), timeout=8.0)
+            whoisjson_task = asyncio.wait_for(whoisjson_service.get_domain_data(domain_for_scan), timeout=8.0)
+            
+            vt_res, urlscan_res, otx_res, ds_res, wj_res = await asyncio.gather(
+                vt_task, urlscan_task, otx_task, domainscan_task, whoisjson_task,
                 return_exceptions=True
             )
 
             vt_res = vt_res if not isinstance(vt_res, Exception) else virustotal_service._get_fallback_data()
             urlscan_res = urlscan_res if not isinstance(urlscan_res, Exception) else urlscan_service._get_fallback_data(target_url)
             otx_res = otx_res if not isinstance(otx_res, Exception) else alienvault_service._get_fallback_data(target_url)
+            ds_res = ds_res if not isinstance(ds_res, Exception) else None
+            wj_res = wj_res if not isinstance(wj_res, Exception) else None
+            
             vt_res = ensure_provenance(vt_res, "VirusTotal")
             urlscan_res = ensure_provenance(urlscan_res, "urlscan.io")
             otx_res = ensure_provenance(otx_res, "AlienVault OTX")
@@ -74,6 +87,8 @@ async def analyze_url(payload: ScanCreate, db: Session = Depends(get_db)):
             "virustotal": vt_res,
             "urlscan": urlscan_res,
             "alienvault_otx": otx_res,
+            "domainscan": ds_res,
+            "whoisjson": wj_res,
             "report_schema": "url.v1",
             "risk_confidence": risk_results
         }
