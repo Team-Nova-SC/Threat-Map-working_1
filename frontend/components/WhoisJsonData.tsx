@@ -25,13 +25,24 @@ export default function WhoisJsonData({ data }: WhoisJsonDataProps) {
 
   return (
     <div className="glass-panel rounded-xl p-md flex flex-col border border-white/5 mt-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-secondary-container rounded-lg border border-white/10">
-          <span className="material-symbols-outlined text-on-secondary-container text-[20px]">account_tree</span>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-secondary-container rounded-lg border border-white/10">
+            <span className="material-symbols-outlined text-on-secondary-container text-[20px]">account_tree</span>
+          </div>
+          <h3 className="text-sm font-bold text-white tracking-wider font-label-caps uppercase">
+            WhoisJSON Deep Inspection
+          </h3>
         </div>
-        <h3 className="text-sm font-bold text-white tracking-wider font-label-caps uppercase">
-          WhoisJSON Deep Inspection
-        </h3>
+        <a 
+          href="https://whoisjson.com" 
+          target="_blank" 
+          rel="noreferrer"
+          className="px-2 py-1 flex items-center gap-1 rounded bg-white/5 hover:bg-white/10 text-primary text-[10px] font-bold tracking-wider font-label-caps transition-colors border border-white/10"
+        >
+          <span className="material-symbols-outlined text-[12px]">open_in_new</span>
+          View on WhoisJSON
+        </a>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">

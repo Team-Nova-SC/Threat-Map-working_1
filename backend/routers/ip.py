@@ -14,8 +14,11 @@ from services.ipinfo import ipinfo_service
 from services.greynoise import greynoise_service
 from services.alienvault import alienvault_service
 from services.risk_engine import risk_engine
+from services.risk_engine import risk_engine
 from services.ai_service import ai_service
 from services.provider_result import unavailable
+from services.domainscan import domainscan_service
+from services.whoisjson import whoisjson_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyze", tags=["IP Analysis"])
@@ -54,17 +57,21 @@ async def analyze_ip(payload: ScanCreate, db: Session = Depends(get_db)):
             ipinfo_task = asyncio.wait_for(ipinfo_service.get_ip_info(ip), timeout=30.0)
             greynoise_task = asyncio.wait_for(greynoise_service.check_ip(ip), timeout=30.0)
             otx_task = asyncio.wait_for(alienvault_service.get_indicator_report(ip, "ip"), timeout=8.0)
-            vt_res, abuse_res, ipinfo_res, gn_res, otx_res = await asyncio.gather(
-                vt_task, abuse_task, ipinfo_task, greynoise_task, otx_task,
+            domainscan_task = asyncio.wait_for(domainscan_service.get_scan_data(ip), timeout=8.0)
+            whoisjson_task = asyncio.wait_for(whoisjson_service.get_domain_data(ip), timeout=8.0)
+            vt_res, abuse_res, ipinfo_res, gn_res, otx_res, ds_res, wj_res = await asyncio.gather(
+                vt_task, abuse_task, ipinfo_task, greynoise_task, otx_task, domainscan_task, whoisjson_task,
                 return_exceptions=True
             )
 
             # Handle potential exceptions during parallel queries
             vt_res = vt_res if isinstance(vt_res, dict) else unavailable("VirusTotal", str(vt_res), "timeout" if isinstance(vt_res, asyncio.TimeoutError) else "error")
             abuse_res = abuse_res if isinstance(abuse_res, dict) else unavailable("AbuseIPDB", str(abuse_res), "timeout" if isinstance(abuse_res, asyncio.TimeoutError) else "error")
-            ipinfo_res = ipinfo_res if isinstance(ipinfo_res, dict) else unavailable("IPinfo", str(ipinfo_res), "timeout" if isinstance(ipinfo_res, asyncio.TimeoutError) else "error")
-            gn_res = gn_res if isinstance(gn_res, dict) else unavailable("GreyNoise", str(gn_res), "timeout" if isinstance(gn_res, asyncio.TimeoutError) else "error")
-            otx_res = otx_res if isinstance(otx_res, dict) else unavailable("AlienVault OTX", str(otx_res), "timeout" if isinstance(otx_res, asyncio.TimeoutError) else "error")
+            ipinfo_res = ipinfo_res if not isinstance(ipinfo_res, Exception) else ipinfo_service._get_fallback_data(ip)
+            gn_res = gn_res if not isinstance(gn_res, Exception) else greynoise_service._get_fallback_data(ip)
+            otx_res = otx_res if not isinstance(otx_res, Exception) else alienvault_service._get_fallback_data(ip)
+            ds_res = ds_res if not isinstance(ds_res, Exception) else None
+            wj_res = wj_res if not isinstance(wj_res, Exception) else None
 
             logger.info(f"IPinfo for {ip}: {ipinfo_res.get('city')}, {ipinfo_res.get('country')} (status={ipinfo_res.get('status')})") 
 
@@ -92,6 +99,8 @@ async def analyze_ip(payload: ScanCreate, db: Session = Depends(get_db)):
             "greynoise": gn_res,
             "ipinfo": ipinfo_res,
             "alienvault_otx": otx_res,
+            "domainscan": ds_res,
+            "whoisjson": wj_res,
             "report_schema": "ip.v1",
             "risk_confidence": risk_results
         }

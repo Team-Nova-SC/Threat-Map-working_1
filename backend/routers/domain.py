@@ -14,6 +14,8 @@ from services.osint import osint_service
 from services.risk_engine import risk_engine
 from services.ai_service import ai_service
 from services.provider_result import ensure_provenance, unavailable
+from services.domainscan import domainscan_service
+from services.whoisjson import whoisjson_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analyze", tags=["Domain Analysis"])
@@ -47,8 +49,11 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             whois_task = asyncio.wait_for(osint_service.get_whois_data(domain), timeout=30.0)
             ssl_task = asyncio.wait_for(osint_service.get_ssl_metadata(domain), timeout=30.0)
             
-            vt_res, urlscan_res, otx_res, dns_res, whois_res, ssl_res = await asyncio.gather(
-                vt_task, urlscan_task, otx_task, dns_task, whois_task, ssl_task,
+            domainscan_task = asyncio.wait_for(domainscan_service.get_scan_data(domain), timeout=8.0)
+            whoisjson_task = asyncio.wait_for(whoisjson_service.get_domain_data(domain), timeout=8.0)
+            
+            vt_res, urlscan_res, otx_res, dns_res, whois_res, ssl_res, ds_res, wj_res = await asyncio.gather(
+                vt_task, urlscan_task, otx_task, dns_task, whois_task, ssl_task, domainscan_task, whoisjson_task,
                 return_exceptions=True
             )
 
@@ -58,6 +63,8 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             dns_res = dns_res if not isinstance(dns_res, Exception) else unavailable("DNS", str(dns_res), "timeout" if isinstance(dns_res, asyncio.TimeoutError) else "error")
             whois_res = whois_res if not isinstance(whois_res, Exception) else unavailable("WHOIS", str(whois_res), "timeout" if isinstance(whois_res, asyncio.TimeoutError) else "error")
             ssl_res = ssl_res if not isinstance(ssl_res, Exception) else unavailable("TLS certificate", str(ssl_res), "timeout" if isinstance(ssl_res, asyncio.TimeoutError) else "error")
+            ds_res = ds_res if not isinstance(ds_res, Exception) else None
+            wj_res = wj_res if not isinstance(wj_res, Exception) else None
             vt_res = ensure_provenance(vt_res, "VirusTotal")
             urlscan_res = ensure_provenance(urlscan_res, "urlscan.io")
             otx_res = ensure_provenance(otx_res, "AlienVault OTX")
@@ -112,6 +119,8 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             "dns_records": dns_res,
             "whois_records": whois_res,
             "ssl_metadata": ssl_res,
+            "domainscan": ds_res,
+            "whoisjson": wj_res,
             "report_schema": "domain.v1",
             "historical_whois_changes": whois_changes,
             "risk_confidence": risk_results
