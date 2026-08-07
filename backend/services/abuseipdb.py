@@ -37,11 +37,17 @@ class AbuseIPDBService:
                         "ipAddress": data.get("ipAddress", ip),
                         "abuseConfidenceScore": data.get("abuseConfidenceScore", 0),
                         "totalReports": data.get("totalReports", 0),
+                        "numDistinctUsers": data.get("numDistinctUsers", 0),
+                        "lastReportedAt": data.get("lastReportedAt"),
                         "countryCode": data.get("countryCode"),
                         "countryName": data.get("countryName"),
                         "domain": data.get("domain", ""),
+                        "hostnames": data.get("hostnames", []),
                         "isp": data.get("isp", ""),
+                        "usageType": data.get("usageType", ""),
                         "isTor": data.get("isTor", False),
+                        "isWhitelisted": data.get("isWhitelisted", False),
+                        "reports": data.get("reports", []),
                         "raw": data
                     })
                 else:

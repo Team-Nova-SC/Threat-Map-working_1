@@ -40,53 +40,49 @@ class AIService:
             if not self.client:
                 return self._get_fallback_brief(indicator, ind_type, risk_score, vt_malicious, abuse_score)
 
-            SYSTEM = """You are a cybersecurity analyst assistant.
+            SYSTEM = """You are a senior cybersecurity analyst.
 You ONLY analyze data that is given to you.
 You NEVER invent, assume or hallucinate threats.
-If the data shows clean results you say it is clean.
-You must follow these rules without exception:
-- vt_malicious = 0 means VirusTotal found nothing wrong
-- abuse_score < 10 means no significant abuse reports  
-- If both are low, threat_category MUST be benign_asset
-- NEVER output botnet/malware/phishing unless 
-  vt_malicious > 5 or abuse_score > 50
-
-You MUST return your response as a raw JSON object and nothing else.
+You must return your response as a raw JSON object and nothing else.
 Do not wrap it in markdown block quotes like ```json ... ```. Just the JSON object.
 """
 
+            # Dump relevant data context to prompt
+            context = {
+                "virustotal": raw_data.get("virustotal", {}),
+                "abuseipdb": raw_data.get("abuseipdb", {}),
+                "greynoise": raw_data.get("greynoise", {}),
+                "alienvault": raw_data.get("alienvault_otx", {})
+            }
+
             PROMPT = f"""
-Analyze this real threat intelligence scan result.
-Base your response ONLY on the numbers below.
-Do not add any information not in this data.
+Analyze this threat intelligence scan result. Base your response ONLY on the provided JSON data.
 
 TARGET: {indicator}
 TYPE: {ind_type}
+RISK LEVEL: {risk_level} ({risk_score}/100)
 
-REAL API RESULTS:
-- VirusTotal malicious engines: {vt_malicious} out of {vt_total}
-- AbuseIPDB confidence score: {abuse_score} out of 100
-- GreyNoise classification: {greynoise_class}
-- Risk score calculated: {risk_score} out of 100
-- Risk level: {risk_level}
+RAW DATA CONTEXT:
+{json.dumps(context, indent=2)[:3000]}
 
 STRICT RULES:
-- If vt_malicious is 0 and abuse_score < 10:
-  category = "benign_asset", summary must say SAFE
-- If vt_malicious > 5 or abuse_score > 50:
-  category = actual threat type from data
-- Never say BOTNET C2 unless data proves it
-- Recommendations must match the actual risk level
+1. 'summary' must be a 2-sentence plain English summary.
+2. 'detailed_markdown' must be a highly detailed report formatted in GitHub Flavored Markdown.
+   - Use Markdown tables to visualize the breakdown of vendor detections or scores.
+   - You MUST include "Proof & Citations" linking back to the trusted sources (e.g., https://www.virustotal.com/gui/search/{indicator} or https://www.abuseipdb.com/check/{indicator}).
+   - Use bolding, lists, and headers to make it look professional and beautiful.
+   - Do NOT wrap the JSON itself in markdown, just put the markdown string inside the JSON field.
 
 Respond ONLY with this JSON, no other text:
 {{
-  "summary": "2 sentence plain English summary based strictly on the numbers above",
+  "summary": "2 sentence summary",
   "threat_category": "benign_asset OR actual_threat",
   "recommendations": ["action 1", "action 2", "action 3"],
-  "confidence": "low|medium|high"
+  "confidence": "low|medium|high",
+  "detailed_markdown": "Full markdown report string here..."
 }}
 """
-            # Call Groq synchronously via the client (as we are inside an async def, but Groq python client provides async support if we use AsyncGroq, but since we are using Groq we should use it carefully. Wait, the groq library provides AsyncGroq. Let's just use it in a thread or directly if it's blocking. Actually, we can just use the blocking call in a thread or use AsyncGroq. But groq_service.py uses client.chat.completions.create synchronously in an async function which is bad. Let's use run_in_executor here.)
+            # Call Groq synchronously
             import asyncio
             def call_groq():
                 return self.client.chat.completions.create(
@@ -97,7 +93,7 @@ Respond ONLY with this JSON, no other text:
                     ],
                     response_format={"type": "json_object"},
                     temperature=0.1,
-                    max_completion_tokens=500
+                    max_completion_tokens=1500
                 )
             
             try:

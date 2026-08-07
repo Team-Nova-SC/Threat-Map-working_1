@@ -15,6 +15,9 @@ import CommunityNotes from "@/components/CommunityNotes";
 import DomainScanMetrics from "@/components/DomainScanMetrics";
 import WhoisJsonData from "@/components/WhoisJsonData";
 import VirusTotalDeepInspection from "@/components/VirusTotalDeepInspection";
+import AbuseIpdbDeepInspection from "@/components/AbuseIpdbDeepInspection";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { useChat } from "@/context/ChatContext";
 import dynamic from "next/dynamic";
 import { Download, Plus, Check, Share2, Target, FileCode2, AlertTriangle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -58,6 +61,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<"overview" | "graph" | "notes">("overview");
   const [scanHistory, setScanHistory] = useState<any[]>([]);
   const { addToast } = useToast();
+  const { setIsWidgetOpen, setInput, handleSend } = useChat();
   const { data: session } = useSession();
   const [isSavingDrive, setIsSavingDrive] = useState(false);
 
@@ -614,9 +618,34 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
                     </p>
                   </div>
                 ) : null}
+
+                {ai.detailed_markdown && (
+                  <div className="mt-4 border-t border-white/5 pt-4">
+                    <p className="text-[11px] font-mono-sm uppercase text-primary font-bold mb-3">
+                      Deep Analytics Visualization
+                    </p>
+                    <div className="prose prose-invert prose-sm max-w-none prose-p:text-on-surface-variant prose-headings:text-white prose-a:text-primary hover:prose-a:text-primary/80 prose-strong:text-white prose-td:border-white/10 prose-th:border-white/10 prose-table:border-white/10">
+                      <MarkdownRenderer content={ai.detailed_markdown} />
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="text-[10px] text-on-surface-variant/60 font-mono-sm mt-4 text-right">
-                Generated via Groq - Structured Mode
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
+                <button
+                  onClick={() => {
+                    setIsWidgetOpen(true);
+                    setTimeout(() => {
+                      handleSend(`Can you provide a highly detailed deep summary and visualization for this indicator: ${scan.indicator}?`, null);
+                    }, 300);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-xs font-bold transition-colors border border-primary/20"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chat</span>
+                  Ask AI for Deep Summary
+                </button>
+                <div className="text-[10px] text-on-surface-variant/60 font-mono-sm text-right">
+                  Generated via Groq - Structured Mode
+                </div>
               </div>
             </>
           )}
@@ -859,6 +888,11 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       {/* VirusTotal Deep Inspection */}
       {vt && vt.attributes && (
         <VirusTotalDeepInspection vtData={vt} type={scan.type as "ip" | "domain" | "url" | "hash"} />
+      )}
+
+      {/* AbuseIPDB Deep Inspection */}
+      {abuse && abuse.totalReports !== undefined && (
+        <AbuseIpdbDeepInspection abuseData={abuse} />
       )}
 
       {/* DomainScan Analytics */}
