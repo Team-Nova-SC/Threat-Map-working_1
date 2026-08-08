@@ -36,6 +36,19 @@ export interface AlertResponse {
   created_at: string;
 }
 
+export interface MapPoint {
+  lat: number;
+  lon: number;
+  label: string;
+  level: string;
+  indicator: string;
+  risk_score: number;
+  country: string;
+  scanned_at: string;
+  type?: string;
+  scan_id?: string;
+}
+
 export interface DashboardStats {
   total_scans_24h: number;
   critical_threats: number;
@@ -54,4 +67,5 @@ export interface DashboardStats {
     percentage: number;
     trend: "up" | "down";
   }>;
+  map_points?: MapPoint[];
 }
