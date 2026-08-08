@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import re
 from typing import Dict, Any
 from groq import Groq
 from core.config import settings
@@ -7,17 +9,15 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 class AIService:
-    def __init__(self):
-        self.api_key = settings.GROQ_API_KEY
-        self.client = None
-        if self.api_key:
+    def _get_client(self):
+        api_key = settings.GROQ_API_KEY or os.getenv("GROQ_API_KEY")
+        if api_key and api_key != "your_key_here":
             try:
-                self.client = Groq(api_key=self.api_key)
-                logger.info("Groq API configured for AI analysis.")
+                return Groq(api_key=api_key)
             except Exception as e:
                 logger.error(f"Failed to initialize Groq client: {e}")
-        else:
-            logger.warning("Groq API key not set. AI analysis will fall back to rule-based scoring.")
+                return None
+        return None
 
     async def generate_threat_brief(self, indicator: str, ind_type: str, risk_score: int, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -37,7 +37,9 @@ class AIService:
             greynoise_class = raw_data.get("greynoise", {}).get("classification", "unknown")
             risk_level = "LOW" if risk_score < 30 else "MEDIUM" if risk_score < 60 else "HIGH" if risk_score < 80 else "CRITICAL"
 
-            if not self.client:
+            client = self._get_client()
+            if not client:
+                logger.warning("Groq API key not set or client unavailable. Returning fallback brief.")
                 return self._get_fallback_brief(indicator, ind_type, risk_score, vt_malicious, abuse_score)
 
             SYSTEM = """You are a senior cybersecurity analyst.
@@ -82,10 +84,9 @@ Respond ONLY with this JSON, no other text:
   "detailed_markdown": "Full markdown report string here..."
 }}
 """
-            # Call Groq synchronously
             import asyncio
             def call_groq():
-                return self.client.chat.completions.create(
+                return client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
                     messages=[
                         {"role": "system", "content": SYSTEM},
@@ -93,25 +94,30 @@ Respond ONLY with this JSON, no other text:
                     ],
                     response_format={"type": "json_object"},
                     temperature=0.1,
-                    max_completion_tokens=1500
+                    max_tokens=1500
                 )
             
             try:
                 loop = asyncio.get_event_loop()
                 response = await asyncio.wait_for(
                     loop.run_in_executor(None, call_groq),
-                    timeout=10.0
+                    timeout=12.0
                 )
                 response_text = response.choices[0].message.content.strip()
             except asyncio.TimeoutError:
-                logger.error(f"Groq AI timed out after 10s for indicator: {indicator}. Using fallback.")
+                logger.error(f"Groq AI timed out after 12s for indicator: {indicator}. Using fallback.")
                 return self._get_fallback_brief(indicator, ind_type, risk_score, vt_malicious, abuse_score)
             except Exception as groq_exc:
                 logger.error(f"Groq API call failed: {groq_exc}. Using fallback.")
                 return self._get_fallback_brief(indicator, ind_type, risk_score, vt_malicious, abuse_score)
 
+            # Clean markdown formatting if present
+            cleaned_text = re.sub(r"^```json\s*", "", response_text)
+            cleaned_text = re.sub(r"^```\s*", "", cleaned_text)
+            cleaned_text = re.sub(r"\s*```$", "", cleaned_text).strip()
+
             try:
-                parsed_brief = json.loads(response_text)
+                parsed_brief = json.loads(cleaned_text)
             except json.JSONDecodeError as je:
                 logger.error(f"Failed to parse Groq JSON: {je}. Raw: {response_text}")
                 return self._get_fallback_brief(indicator, ind_type, risk_score, vt_malicious, abuse_score)
@@ -128,7 +134,6 @@ Respond ONLY with this JSON, no other text:
                 return self._get_fallback_brief(indicator, ind_type, risk_score, vt_malicious, abuse_score)
 
         except Exception as e:
-            # Top-level safety net — this function MUST NEVER crash the caller
             logger.error(f"[ai_service] Unexpected error in generate_threat_brief: {e}", exc_info=True)
             return self._get_fallback_brief(indicator, ind_type, risk_score, vt_malicious, abuse_score)
 
@@ -145,3 +150,4 @@ Respond ONLY with this JSON, no other text:
         }
 
 ai_service = AIService()
+
