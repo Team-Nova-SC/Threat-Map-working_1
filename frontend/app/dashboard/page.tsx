@@ -15,6 +15,7 @@ import { motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { GlobalMapPoint } from "@/components/GlobalMap";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Dynamically load the Leaflet Global Threat Map to bypass SSR issues
 const GlobalMap = dynamic(() => import("@/components/GlobalMap"), {
@@ -245,7 +246,9 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="h-[350px] relative">
-            <GlobalMap points={mapPoints} />
+            <ErrorBoundary name="Global Map">
+              <GlobalMap points={mapPoints} />
+            </ErrorBoundary>
           </div>
         </div>
 
@@ -355,10 +358,12 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex-1 flex items-center justify-center">
-            <ThreatRadar
-              distribution={stats?.threat_distribution || { critical: 0, high: 0, medium: 0, low: 0 }}
-              totalScans={stats?.total_scans_24h || 0}
-            />
+            <ErrorBoundary name="Threat Radar">
+              <ThreatRadar
+                distribution={stats?.threat_distribution || { critical: 0, high: 0, medium: 0, low: 0 }}
+                totalScans={stats?.total_scans_24h || 0}
+              />
+            </ErrorBoundary>
           </div>
         </div>
 

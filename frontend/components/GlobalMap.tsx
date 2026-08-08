@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useRef } from "react";
 
 export interface GlobalMapPoint {
@@ -41,12 +42,22 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ points }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapInstanceRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markersLayerRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const leafletLRef = useRef<any>(null);
 
-  // Empty input means there is no real geolocated scan data yet.
   const activePoints = Array.isArray(points) ? points : [];
   const dangerCount  = activePoints.filter(p => p && (p.level === "HIGH" || p.level === "CRITICAL")).length;
 
+  const pointsKey = activePoints
+    .map(p => `${p.lat}_${p.lon}_${p.level}_${p.indicator || ""}`)
+    .join("|");
+
+  // 1. Mount map container once safely
   useEffect(() => {
+    let isMounted = true;
+
     if (typeof window === "undefined" || !mapRef.current) return;
 
     if (!document.getElementById("leaflet-css")) {
@@ -58,27 +69,77 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ points }) => {
     }
 
     import("leaflet").then((L) => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
+      if (!isMounted || !mapRef.current) return;
+
+      try {
+        // Clear any orphaned Leaflet internal ID on element
+        if ((mapRef.current as any)._leaflet_id) {
+          (mapRef.current as any)._leaflet_id = null;
+        }
+
+        if (!mapInstanceRef.current) {
+          leafletLRef.current = L;
+
+          const map = L.map(mapRef.current, {
+            zoomControl:        true,
+            scrollWheelZoom:    false,
+            attributionControl: false,
+            minZoom: 2,
+            maxZoom: 12,
+          }).setView([25.0, 10.0], 2);
+
+          mapInstanceRef.current = map;
+
+          L.tileLayer(
+            "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            { attribution: "&copy; CARTO &copy; OpenStreetMap", maxZoom: 20 }
+          ).addTo(map);
+
+          const markersGroup = L.layerGroup().addTo(map);
+          markersLayerRef.current = markersGroup;
+
+          setTimeout(() => {
+            if (mapInstanceRef.current) {
+              try {
+                mapInstanceRef.current.invalidateSize();
+              } catch (_) {}
+            }
+          }, 200);
+        }
+      } catch (err) {
+        console.warn("Leaflet map initialization safe catch:", err);
       }
+    });
 
-      const map = L.map(mapRef.current!, {
-        zoomControl:       true,
-        scrollWheelZoom:   false,
-        attributionControl: false,
-        minZoom: 2,
-        maxZoom: 12,
-      }).setView([25.0, 10.0], 2);
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch (_) {}
+        mapInstanceRef.current = null;
+        markersLayerRef.current = null;
+      }
+      if (mapRef.current) {
+        try {
+          (mapRef.current as any)._leaflet_id = null;
+        } catch (_) {}
+      }
+    };
+  }, []);
 
-      mapInstanceRef.current = map;
+  // 2. Dynamically update markers without tearing down the map
+  useEffect(() => {
+    const L = leafletLRef.current;
+    const markersGroup = markersLayerRef.current;
+    if (!L || !markersGroup || !mapInstanceRef.current) return;
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        { attribution: "&copy; CARTO &copy; OpenStreetMap", maxZoom: 20 }
-      ).addTo(map);
+    try {
+      markersGroup.clearLayers();
 
       activePoints.forEach((pt) => {
+        if (!pt || typeof pt.lat !== "number" || typeof pt.lon !== "number") return;
+
         const color = LEVEL_COLORS[pt.level] || "#64748b";
         const glow  = LEVEL_GLOW[pt.level]   || "#94a3b8";
         const label = LEVEL_LABEL[pt.level]   || pt.level;
@@ -98,35 +159,24 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ points }) => {
           </div>`;
 
         // Inner filled marker
-        L.circleMarker([pt.lat, pt.lon], {
+        const marker = L.circleMarker([pt.lat, pt.lon], {
           radius: 7, fillColor: color, color: glow,
           weight: 2, opacity: 1, fillOpacity: 0.9,
-        })
-          .addTo(map)
-          .bindPopup(popupHtml, { className: "globalmap-popup" });
+        }).bindPopup(popupHtml, { className: "globalmap-popup" });
 
         // Outer pulse ring
-        L.circleMarker([pt.lat, pt.lon], {
+        const pulseRing = L.circleMarker([pt.lat, pt.lon], {
           radius: 16, fillColor: "transparent",
           color: color, weight: 1, opacity: 0.3, fillOpacity: 0,
-        }).addTo(map);
+        });
+
+        markersGroup.addLayer(marker);
+        markersGroup.addLayer(pulseRing);
       });
-
-      setTimeout(() => {
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.invalidateSize();
-        }
-      }, 100);
-    });
-
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(activePoints)]);
+    } catch (err) {
+      console.warn("Leaflet markers update safe catch:", err);
+    }
+  }, [pointsKey]);
 
   return (
     <div className="w-full h-full rounded-xl overflow-hidden border border-white/10 relative" style={{ minHeight: 350 }}>
