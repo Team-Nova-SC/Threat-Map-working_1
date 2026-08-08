@@ -70,6 +70,17 @@ export default function Dashboard() {
     dismissMutation.mutate(alertId);
   };
 
+  const clearAllMutation = useMutation({
+    mutationFn: () => api.clearAllAlerts(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+    },
+  });
+
+  const handleClearAllAlerts = () => {
+    clearAllMutation.mutate();
+  };
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto space-y-6 py-8 animate-pulse px-4 md:px-8">
@@ -98,17 +109,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const clearAllMutation = useMutation({
-    mutationFn: () => api.clearAllAlerts(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
-    },
-  });
-
-  const handleClearAllAlerts = () => {
-    clearAllMutation.mutate();
-  };
 
   const safeMapPoints = (stats?.map_points && Array.isArray(stats.map_points) && stats.map_points.length > 0)
     ? stats.map_points
