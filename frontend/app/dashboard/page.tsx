@@ -14,6 +14,8 @@ import { motion } from "framer-motion";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { GlobalMapPoint } from "@/components/GlobalMap";
+
 // Dynamically load the Leaflet Global Threat Map to bypass SSR issues
 const GlobalMap = dynamic(() => import("@/components/GlobalMap"), {
   ssr: false,
@@ -107,7 +109,7 @@ export default function Dashboard() {
     clearAllMutation.mutate();
   };
 
-  const mapPoints = (stats.map_points && stats.map_points.length > 0)
+  const mapPoints: GlobalMapPoint[] = (stats.map_points && stats.map_points.length > 0)
     ? stats.map_points
     : stats.recent_scans
         .filter((s) => s.raw_data && s.raw_data.ipinfo && s.raw_data.ipinfo.lat && s.raw_data.ipinfo.lon)

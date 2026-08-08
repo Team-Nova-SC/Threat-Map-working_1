@@ -40,11 +40,11 @@ export interface MapPoint {
   lat: number;
   lon: number;
   label: string;
-  level: string;
-  indicator: string;
-  risk_score: number;
-  country: string;
-  scanned_at: string;
+  level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | string;
+  indicator?: string;
+  risk_score?: number;
+  country?: string;
+  scanned_at?: string;
   type?: string;
   scan_id?: string;
 }

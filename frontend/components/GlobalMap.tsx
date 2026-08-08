@@ -1,11 +1,11 @@
 "use client";
 import React, { useEffect, useRef } from "react";
 
-interface GlobalMapPoint {
+export interface GlobalMapPoint {
   lat: number;
   lon: number;
   label: string;
-  level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | string;
   indicator?: string;
   risk_score?: number;
   country?: string;
