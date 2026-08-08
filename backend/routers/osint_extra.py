@@ -350,8 +350,12 @@ async def cve_lookup(cve_id: str):
 
             references = [r.get("url") for r in cve.get("references", [])[:5] if r.get("url")]
 
+            # Query AlienVault OTX for associated CVE threat pulses & exploitation intelligence
+            from services.alienvault import alienvault_service
+            otx_cve_res = await alienvault_service.get_indicator_report(cve_id, "cve")
+
             from services.provider_result import provider_result
-            return provider_result("NIST NVD", "success", {
+            return provider_result("NIST NVD & AlienVault OTX", "success", {
                 "report_schema": "cve.v1",
                 "cve_id": cve_id,
                 "description": description,
@@ -362,6 +366,7 @@ async def cve_lookup(cve_id: str):
                 "last_modified": cve.get("lastModified", ""),
                 "affected_products": list(set(affected_products))[:10],
                 "references": references,
+                "alienvault_otx": otx_cve_res
             })
     except Exception as e:
         logger.error(f"CVE lookup failed for {cve_id}: {e}")

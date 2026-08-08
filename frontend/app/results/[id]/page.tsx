@@ -16,6 +16,7 @@ import DomainScanMetrics from "@/components/DomainScanMetrics";
 import WhoisJsonData from "@/components/WhoisJsonData";
 import VirusTotalDeepInspection from "@/components/VirusTotalDeepInspection";
 import AbuseIpdbDeepInspection from "@/components/AbuseIpdbDeepInspection";
+import AlienVaultDeepInspection from "@/components/AlienVaultDeepInspection";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { useChat } from "@/context/ChatContext";
 import dynamic from "next/dynamic";
@@ -741,19 +742,33 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
           {/* AlienVault OTX */}
           <DetectionCard
             title="AlienVault OTX"
-            subtitle="Global threat intelligence feeds"
+            subtitle="Global open threat exchange feeds"
             status={providerValue(otx, `${otx.pulse_count || 0} pulses`) as string}
-            isMalicious={otx.pulse_count > 0}
+            isMalicious={(otx.pulse_count || 0) > 0}
             iconName="hub"
           >
+            <div className="text-[11px] font-mono space-y-1 mt-1 text-on-surface-variant">
+              {otx.malware_families && otx.malware_families.length > 0 && (
+                <div className="flex justify-between">
+                  <span>Malware:</span>
+                  <span className="text-rose-300 font-bold truncate max-w-[120px]">{otx.malware_families.slice(0, 2).join(", ")}</span>
+                </div>
+              )}
+              {otx.attack_ids && otx.attack_ids.length > 0 && (
+                <div className="flex justify-between">
+                  <span>ATT&CK:</span>
+                  <span className="text-teal-300 font-bold">{otx.attack_ids.length} technique(s)</span>
+                </div>
+              )}
+            </div>
             {otx.tags && otx.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
+              <div className="flex flex-wrap gap-1 mt-2">
                 {otx.tags.slice(0, 4).map((tag: string) => (
                   <span
                     key={tag}
-                    className="text-[9px] font-mono-sm bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-on-surface-variant"
+                    className="text-[9px] font-mono bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-on-surface-variant"
                   >
-                    {tag}
+                    #{tag}
                   </span>
                 ))}
               </div>
@@ -867,6 +882,11 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       {/* AbuseIPDB Deep Inspection */}
       {abuse && abuse.totalReports !== undefined && (
         <AbuseIpdbDeepInspection abuseData={abuse} />
+      )}
+
+      {/* AlienVault OTX Deep Inspection */}
+      {otx && (otx.pulse_count !== undefined || otx.pulses !== undefined) && (
+        <AlienVaultDeepInspection data={otx} />
       )}
 
       {/* DomainScan Analytics */}
