@@ -97,9 +97,9 @@ export default function Home() {
       status: "Active",
     },
     {
-      name: "GreyNoise",
-      description: "Classifies internet background scanners and internet noise.",
-      icon: "hearing",
+      name: "IPinfo Geolocation",
+      description: "Extracts precise IP locations, carrier ISP details, and hosting flags.",
+      icon: "location_on",
       status: "Active",
     },
     {

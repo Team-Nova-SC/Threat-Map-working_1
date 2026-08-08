@@ -34,7 +34,6 @@ class AIService:
                 + raw_data.get("virustotal", {}).get("undetected", 0)
             )
             abuse_score = raw_data.get("abuseipdb", {}).get("abuseConfidenceScore", 0)
-            greynoise_class = raw_data.get("greynoise", {}).get("classification", "unknown")
             risk_level = "LOW" if risk_score < 30 else "MEDIUM" if risk_score < 60 else "HIGH" if risk_score < 80 else "CRITICAL"
 
             client = self._get_client()
@@ -53,7 +52,6 @@ Do not wrap it in markdown block quotes like ```json ... ```. Just the JSON obje
             context = {
                 "virustotal": raw_data.get("virustotal", {}),
                 "abuseipdb": raw_data.get("abuseipdb", {}),
-                "greynoise": raw_data.get("greynoise", {}),
                 "alienvault": raw_data.get("alienvault_otx", {})
             }
 

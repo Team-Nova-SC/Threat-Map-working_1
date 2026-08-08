@@ -7,7 +7,6 @@ from models.database import get_db, Watchlist, Alert, Scan
 from models.schemas import WatchlistResponse, WatchlistCreate, WatchlistUpdate, AlertResponse, AlertUpdate
 from services.virustotal import virustotal_service
 from services.abuseipdb import abuse_ipdb_service
-from services.greynoise import greynoise_service
 from services.risk_engine import risk_engine
 from services.webhook_service import fire_webhook
 import asyncio
@@ -96,16 +95,13 @@ async def scan_watchlist_items(db: Session = Depends(get_db)):
             vt_res = await virustotal_service.get_indicator_report(item.indicator, item.type)
             
             abuse_res = None
-            gn_res = None
             if item.type == "ip":
                 abuse_res = await abuse_ipdb_service.check_ip(item.indicator)
-                gn_res = await greynoise_service.check_ip(item.indicator)
                 
             risk_res = risk_engine.calculate_risk(
                 indicator_type=item.type,
                 vt_data=vt_res,
-                abuse_data=abuse_res,
-                greynoise_data=gn_res
+                abuse_data=abuse_res
             )
             
             new_score = risk_res["score"]

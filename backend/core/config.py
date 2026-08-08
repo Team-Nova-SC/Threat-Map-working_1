@@ -30,8 +30,6 @@ class Settings(BaseSettings):
     ALIENVAULT_API_KEY: str = "YOUR_API_KEY"
     URLSCAN_API_KEY: str = "YOUR_API_KEY"
     
-    # GreyNoise community API headers default
-    GREYNOISE_API_KEY: str = "TreatMap"
     
     # Optional Keys
     GROQ_API_KEY: Optional[str] = None

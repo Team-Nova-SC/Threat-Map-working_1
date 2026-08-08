@@ -91,7 +91,6 @@ export default function AboutPage() {
     { name: "IPinfo", desc: "Reliable IP geolocation and ASN context data.", limit: "50000 requests / month", link: "https://ipinfo.io" },
     { name: "AlienVault OTX", desc: "Global open threat exchange feeds and pulses.", limit: "Generous free tier", link: "https://otx.alienvault.com" },
     { name: "URLScan.io", desc: "Sandbox analysis for URLs and website infrastructure.", limit: "5000 requests / day", link: "https://urlscan.io" },
-    { name: "GreyNoise", desc: "Classifies internet background noise vs targeted threats.", limit: "Community tier limits", link: "https://greynoise.io" },
     { name: "Groq AI", desc: "AI-powered threat summarization and contextualization.", limit: "Dependent on Groq Tier", link: "https://groq.com" },
     { name: "MITRE ATT&CK", desc: "Adversary tactic mapping and knowledge base.", limit: "Open Source Data", link: "https://attack.mitre.org" },
     { name: "crt.sh", desc: "SSL certificate transparency log search.", limit: "No hard limits (rate limited)", link: "https://crt.sh" },

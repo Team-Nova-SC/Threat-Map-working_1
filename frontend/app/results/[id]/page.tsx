@@ -233,7 +233,6 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const raw = scan.raw_data || {};
   const vt = raw.virustotal || {};
   const abuse = raw.abuseipdb || {};
-  const gn = raw.greynoise || {};
   const otx = raw.alienvault_otx || {};
   const urlscan = raw.urlscan || {};
   // dns var left out until domain records mapping expanded
@@ -306,12 +305,11 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const scoreComponents = raw.risk_confidence?.components || {};
   const vtScore = scoreComponents.virustotal?.score;
   const abuseScore = scoreComponents.abuseipdb?.score;
-  const gnScore = scoreComponents.greynoise?.score;
   const plainEnglish = getPlainEnglishSummary(scan.risk_score);
 
   // count active feeds
   const availableStatuses = new Set(["success", "not_found", "not_seen"]);
-  const reportFeeds = scan.type === "ip" ? [vt, abuse, gn] : [vt];
+  const reportFeeds = scan.type === "ip" ? [vt, abuse] : [vt];
   const activeFeedCount = raw.risk_confidence?.provider_count ?? reportFeeds.filter((feed: any) => availableStatuses.has(feed.status)).length;
   const providerValue = (feed: any, value: React.ReactNode) => availableStatuses.has(feed.status) ? value : "Not available";
 
@@ -526,9 +524,8 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             <p className="text-[10px] font-mono-sm uppercase text-on-surface-variant tracking-wider mb-2">Score Breakdown</p>
 
             {[
-              { label: "VirusTotal",   desc: "90+ AV engines",  weight: 40, score: vtScore,    color: "bg-primary" },
-              { label: "AbuseIPDB",    desc: "Community abuse", weight: 35, score: abuseScore,  color: "bg-orange-500" },
-              { label: "GreyNoise",    desc: "Noise scanning",  weight: 25, score: gnScore,     color: "bg-yellow-500" },
+              { label: "VirusTotal",   desc: "90+ AV engines",  weight: 50, score: vtScore,    color: "bg-primary" },
+              { label: "AbuseIPDB",    desc: "Community abuse", weight: 50, score: abuseScore,  color: "bg-orange-500" },
             ].filter(engine => scan.type === "ip" || engine.label === "VirusTotal").map((engine) => (
               <div key={engine.label}>
                 <div className="flex justify-between text-[10px] font-mono-sm mb-1">
@@ -739,30 +736,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             </DetectionCard>
           )}
 
-          {/* GreyNoise (only IP) */}
-          {scan.type === "ip" && (
-            <DetectionCard
-              title="GreyNoise"
-              subtitle="Internet background noise check"
-              status={gn.status === "not_found" ? "Not classified by GreyNoise" : (providerValue(gn, gn.classification || "Not available") as string)}
-              isMalicious={gn.classification === "malicious"}
-              iconName="hearing"
-              vendorLink={`https://viz.greynoise.io/ip/${scan.indicator}`}
-              timestamp={scan.created_at}
-              rawJson={scan.raw_data?.greynoise}
-            >
-              <div className="text-[11px] font-mono-sm space-y-1 text-on-surface-variant">
-                <div className="flex justify-between">
-                  <span>Known Scanner:</span>
-                  <span className="text-white font-bold">{gn.status === "not_found" ? "NO" : (gn.noise ? "YES" : "NO")}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Scanner Name:</span>
-                  <span className="text-white">{gn.status === "not_found" ? "N/A" : (gn.name || "N/A")}</span>
-                </div>
-              </div>
-            </DetectionCard>
-          )}
+
 
           {/* AlienVault OTX */}
           <DetectionCard

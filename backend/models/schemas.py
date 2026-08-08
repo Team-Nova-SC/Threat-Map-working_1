@@ -33,7 +33,7 @@ class IPReportData(BaseModel):
     report_schema: Literal["ip.v1"]
     virustotal: ProviderData
     abuseipdb: ProviderData
-    greynoise: ProviderData
+    greynoise: Optional[ProviderData] = None
     ipinfo: ProviderData
     alienvault_otx: ProviderData
     risk_confidence: Dict[str, Any]

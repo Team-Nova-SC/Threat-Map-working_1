@@ -460,7 +460,6 @@ async def get_api_health():
         ("AbuseIPDB", "https://api.abuseipdb.com/api/v2/check?ipAddress=8.8.8.8", {"Key": settings.ABUSEIPDB_API_KEY, "Accept": "application/json"}),
         ("AlienVault", "https://otx.alienvault.com/api/v1/user/me", {"X-OTX-API-KEY": settings.ALIENVAULT_API_KEY}),
         ("IPinfo", f"https://ipinfo.io/8.8.8.8/json?token={settings.IPINFO_API_TOKEN}", {}),
-        ("GreyNoise", "https://api.greynoise.io/v3/community/8.8.8.8", {"key": settings.GREYNOISE_API_KEY}),
     ]
     
     async def ping_api(client, name, url, headers):

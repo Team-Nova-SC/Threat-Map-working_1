@@ -107,8 +107,7 @@ def _export_csv(scan: Scan):
         abuse = raw_data.get("abuseipdb", {})
         writer.writerow(["AbuseIPDB Score", abuse.get("abuseConfidenceScore", 0)])
         writer.writerow(["AbuseIPDB Reports", abuse.get("totalReports", 0)])
-        gn = raw_data.get("greynoise", {})
-        writer.writerow(["GreyNoise Classification", gn.get("classification", "unknown")])
+
 
     output.seek(0)
     return StreamingResponse(
@@ -232,13 +231,11 @@ def _export_pdf(scan: Scan):
     
     if scan.type == "ip":
         abuse = raw.get("abuseipdb", {})
-        gn = raw.get("greynoise", {})
         ipinfo = raw.get("ipinfo", {})
         domainscan = raw.get("domainscan", {}).get("performance_metrics", {})
         whois = raw.get("whoisjson", {})
         
         telemetry_data.append(["AbuseIPDB", f"{abuse.get('abuseConfidenceScore', 0)}% abuse confidence with {abuse.get('totalReports', 0)} reports"])
-        telemetry_data.append(["GreyNoise", f"Classification: {gn.get('classification', 'unknown')}"])
         telemetry_data.append(["IPInfo (ASN)", f"Network: {ipinfo.get('org', 'Unknown')}"])
         
         if domainscan:
