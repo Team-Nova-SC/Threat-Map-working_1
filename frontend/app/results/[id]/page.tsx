@@ -17,6 +17,7 @@ import WhoisJsonData from "@/components/WhoisJsonData";
 import VirusTotalDeepInspection from "@/components/VirusTotalDeepInspection";
 import AbuseIpdbDeepInspection from "@/components/AbuseIpdbDeepInspection";
 import AlienVaultDeepInspection from "@/components/AlienVaultDeepInspection";
+import UrlscanDeepInspection from "@/components/UrlscanDeepInspection";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { useChat } from "@/context/ChatContext";
 import dynamic from "next/dynamic";
@@ -746,19 +747,34 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
             status={providerValue(otx, `${otx.pulse_count || 0} pulses`) as string}
             isMalicious={(otx.pulse_count || 0) > 0}
             iconName="hub"
+            vendorLink={`https://otx.alienvault.com/indicator/${scan.type === 'ip' ? 'IPv4' : scan.type}/${scan.indicator}`}
           >
             <div className="text-[11px] font-mono space-y-1 mt-1 text-on-surface-variant">
-              {otx.malware_families && otx.malware_families.length > 0 && (
-                <div className="flex justify-between">
-                  <span>Malware:</span>
-                  <span className="text-rose-300 font-bold truncate max-w-[120px]">{otx.malware_families.slice(0, 2).join(", ")}</span>
+              {(otx.pulse_count || 0) === 0 ? (
+                <div className="flex flex-col gap-1">
+                  <div className="flex justify-between">
+                    <span>Threat Level:</span>
+                    <span className="text-emerald-400 font-bold">CLEAN (0 Pulses)</span>
+                  </div>
+                  <p className="text-[10px] text-on-surface-variant/70 leading-tight">
+                    No active threat pulses submitted by AlienVault community analysts for this target.
+                  </p>
                 </div>
-              )}
-              {otx.attack_ids && otx.attack_ids.length > 0 && (
-                <div className="flex justify-between">
-                  <span>ATT&CK:</span>
-                  <span className="text-teal-300 font-bold">{otx.attack_ids.length} technique(s)</span>
-                </div>
+              ) : (
+                <>
+                  {otx.malware_families && otx.malware_families.length > 0 && (
+                    <div className="flex justify-between">
+                      <span>Malware:</span>
+                      <span className="text-rose-300 font-bold truncate max-w-[120px]">{otx.malware_families.slice(0, 2).join(", ")}</span>
+                    </div>
+                  )}
+                  {otx.attack_ids && otx.attack_ids.length > 0 && (
+                    <div className="flex justify-between">
+                      <span>ATT&CK:</span>
+                      <span className="text-teal-300 font-bold">{otx.attack_ids.length} technique(s)</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
             {otx.tags && otx.tags.length > 0 && (
@@ -800,8 +816,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               title="URLScan Sandbox"
               subtitle="Visual screenshot & link safety check"
               status={urlscan.overall_status || (urlscan.screenshot_url ? "success" : "pending")}
-              isMalicious={false}
+              isMalicious={urlscan.verdicts?.overall?.malicious === true}
               iconName="pageview"
+              vendorLink={urlscan.report_url || `https://urlscan.io/search/#${scan.indicator}`}
             >
               <div className="relative mt-2 h-24 rounded border border-white/5 overflow-hidden group cursor-zoom-in bg-surface-container-low flex items-center justify-center">
                 {urlscan.screenshot_url ? (
@@ -810,7 +827,6 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
                     alt="URLScan Screenshot"
                     className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                     onError={(e) => {
-                      // Hide broken image, show fallback div
                       e.currentTarget.style.display = "none";
                       const parent = e.currentTarget.parentElement;
                       if (parent) {
@@ -843,6 +859,7 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               title="OSINT WHOIS & DNS"
               subtitle="Domain registration & certificate data"
               status="records" isMalicious={false} iconName="lan"
+              vendorLink={`https://whois.domaintools.com/${scan.indicator}`}
             >
               <div className="text-[10px] font-mono-sm space-y-1 text-on-surface-variant">
                 <div className="flex justify-between">
@@ -887,6 +904,11 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       {/* AlienVault OTX Deep Inspection */}
       {otx && (otx.pulse_count !== undefined || otx.pulses !== undefined) && (
         <AlienVaultDeepInspection data={otx} />
+      )}
+
+      {/* URLScan Sandbox Deep Inspection */}
+      {urlscan && (
+        <UrlscanDeepInspection data={urlscan} indicator={scan.indicator} />
       )}
 
       {/* DomainScan Analytics */}
@@ -1173,6 +1195,52 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
                 }
               });
             });
+
+            // 5. AlienVault OTX Relationships
+            if (otx.passive_dns && otx.passive_dns.length > 0) {
+              otx.passive_dns.slice(0, 8).forEach((pd: any) => {
+                const host = pd.hostname;
+                if (host && host !== scan!.indicator && !nodes.find(n => n.id === host)) {
+                  nodes.push({ id: host, label: host, type: "domain" });
+                  edges.push({ from: scan!.indicator, to: host, label: "passive DNS" });
+                }
+              });
+            }
+
+            if (otx.malware_samples && otx.malware_samples.length > 0) {
+              otx.malware_samples.slice(0, 5).forEach((mw: any) => {
+                const hashId = mw.hash;
+                if (hashId && !nodes.find(n => n.id === hashId)) {
+                  nodes.push({ id: hashId, label: (mw.name || hashId).slice(0, 15), type: "hash" });
+                  edges.push({ from: scan!.indicator, to: hashId, label: "malware sample" });
+                }
+              });
+            }
+
+            // 6. URLScan Relationships
+            if (urlscan.lists) {
+              (urlscan.lists.domains || []).slice(0, 6).forEach((d: string) => {
+                if (d && d !== scan!.indicator && !nodes.find(n => n.id === d)) {
+                  nodes.push({ id: d, label: d, type: "domain" });
+                  edges.push({ from: scan!.indicator, to: d, label: "contacted domain" });
+                }
+              });
+              (urlscan.lists.ips || []).slice(0, 5).forEach((ip: string) => {
+                if (ip && ip !== scan!.indicator && !nodes.find(n => n.id === ip)) {
+                  nodes.push({ id: ip, label: ip, type: "ioc" });
+                  edges.push({ from: scan!.indicator, to: ip, label: "contacted IP" });
+                }
+              });
+            }
+
+            // 7. WHOIS Registrar Node
+            if (whois.registrar && whois.registrar !== "Not available") {
+              const regId = `reg_${whois.registrar}`;
+              if (!nodes.find(n => n.id === regId)) {
+                nodes.push({ id: regId, label: whois.registrar, type: "registrar" });
+                edges.push({ from: scan!.indicator, to: regId, label: "registered with" });
+              }
+            }
 
             return (
               <div className="flex flex-col lg:flex-row min-h-[500px]">

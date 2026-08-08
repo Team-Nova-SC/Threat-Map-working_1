@@ -23,11 +23,15 @@ interface RelationshipGraphProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  ioc: "#6366f1",    // indigo-500
-  asn: "#0ea5e9",    // sky-500
-  country: "#10b981",// emerald-500
-  actor: "#ef4444",  // red-500
-  subnet: "#f59e0b", // amber-500
+  ioc: "#6366f1",      // indigo-500
+  asn: "#0ea5e9",      // sky-500
+  country: "#10b981",  // emerald-500
+  actor: "#ef4444",    // red-500
+  subnet: "#f59e0b",   // amber-500
+  domain: "#38bdf8",   // sky-400
+  hash: "#f43f5e",     // rose-500
+  service: "#a855f7",  // purple-500
+  registrar: "#ec4899" // pink-500
 };
 
 export const RelationshipGraph: React.FC<RelationshipGraphProps> = ({ nodes, edges }) => {
