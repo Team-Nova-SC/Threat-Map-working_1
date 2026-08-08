@@ -97,6 +97,11 @@ export const api = {
     return response.data;
   },
 
+  clearAllAlerts: async () => {
+    const response = await apiClient.post("/watchlist/alerts/clear-all");
+    return response.data;
+  },
+
   // Advanced OSINT Endpoints
   getReverseDns: async (ip: string) => {
     const response = await apiClient.get(`/osint/reverse-dns/${ip}`);

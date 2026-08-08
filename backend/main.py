@@ -320,6 +320,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     # Redis caching
     cache_key = "dashboard_stats"
     from core.cache import cache_service
+    from services.alert_engine import extract_map_points_from_db, sync_recent_scan_alerts
     import json
     
     cached = cache_service.get(cache_key)
@@ -332,6 +333,9 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     try:
         now = datetime.datetime.utcnow()
         past_24h = now - datetime.timedelta(hours=24)
+
+        # Sync active alerts if missing
+        sync_recent_scan_alerts(db)
 
         # 1. Scans count in past 24 hours
         scans_count = db.query(Scan).filter(Scan.created_at >= past_24h).count()
@@ -357,9 +361,12 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         recent_scans = db.query(Scan).order_by(Scan.created_at.desc()).limit(10).all()
 
         # 6. Active alerts
-        active_alerts = db.query(Alert).filter(Alert.is_dismissed == False).order_by(Alert.created_at.desc()).limit(10).all()
+        active_alerts = db.query(Alert).filter(Alert.is_dismissed == False).order_by(Alert.created_at.desc()).limit(15).all()
 
-        # 7. Threat distribution percentages
+        # 7. Extract complete map points from ALL DB scans
+        all_map_points = extract_map_points_from_db(db)
+
+        # 8. Threat distribution percentages
         dist = {"critical": 0, "high": 0, "medium": 0, "low": 0}
         if total_all_scans > 0:
             dist = {
@@ -371,7 +378,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         else:
             dist = {"critical": 25, "high": 35, "medium": 30, "low": 10}
 
-        # 8. Malware prevalence ranking
+        # 9. Malware prevalence ranking
         malware_prevalence = [
             {"name": "Ransom.LockBit", "percentage": 82, "trend": "up"},
             {"name": "Emotet.Botnet", "percentage": 65, "trend": "down"},
@@ -386,12 +393,13 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             recent_scans=recent_scans,
             alerts=active_alerts,
             threat_distribution=dist,
-            malware_prevalence=malware_prevalence
+            malware_prevalence=malware_prevalence,
+            map_points=all_map_points
         )
 
         try:
-            # cache for 60 seconds
-            cache_service.set(cache_key, stats.json(), expire=60)
+            # cache for 15 seconds
+            cache_service.set(cache_key, stats.json(), expire=15)
         except Exception:
             pass
             
@@ -406,7 +414,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             recent_scans=[],
             alerts=[],
             threat_distribution={"critical": 0, "high": 0, "medium": 0, "low": 0},
-            malware_prevalence=[]
+            malware_prevalence=[],
+            map_points=[]
         )
 
 

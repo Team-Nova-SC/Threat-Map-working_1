@@ -159,6 +159,8 @@ async def analyze_domain(payload: ScanCreate, db: Session = Depends(get_db)):
             db.add(db_scan)
             db.commit()
             db.refresh(db_scan)
+            from services.alert_engine import evaluate_scan_alert
+            evaluate_scan_alert(db, db_scan)
         except Exception as dbe:
             db.rollback()
             logger.error(f"[domain] Failed to record domain scan: {dbe}")

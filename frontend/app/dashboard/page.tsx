@@ -96,18 +96,31 @@ export default function Dashboard() {
     );
   }
 
-  const mapPoints = stats.recent_scans
-    .filter((s) => s.raw_data && s.raw_data.ipinfo && s.raw_data.ipinfo.lat && s.raw_data.ipinfo.lon)
-    .map((s) => ({
-      lat:        s.raw_data!.ipinfo.lat,
-      lon:        s.raw_data!.ipinfo.lon,
-      label:      `${s.indicator} (${s.raw_data!.ipinfo.city || "Unknown"})`,
-      level:      s.risk_level,
-      indicator:  s.indicator,
-      risk_score: s.risk_score,
-      country:    s.raw_data!.ipinfo.country || s.raw_data!.ipinfo.region || "Unknown",
-      scanned_at: s.created_at,
-    }));
+  const clearAllMutation = useMutation({
+    mutationFn: () => api.clearAllAlerts(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+    },
+  });
+
+  const handleClearAllAlerts = () => {
+    clearAllMutation.mutate();
+  };
+
+  const mapPoints = (stats.map_points && stats.map_points.length > 0)
+    ? stats.map_points
+    : stats.recent_scans
+        .filter((s) => s.raw_data && s.raw_data.ipinfo && s.raw_data.ipinfo.lat && s.raw_data.ipinfo.lon)
+        .map((s) => ({
+          lat:        s.raw_data!.ipinfo.lat,
+          lon:        s.raw_data!.ipinfo.lon,
+          label:      `${s.indicator} (${s.raw_data!.ipinfo.city || "Unknown"})`,
+          level:      s.risk_level,
+          indicator:  s.indicator,
+          risk_score: s.risk_score,
+          country:    s.raw_data!.ipinfo.country || s.raw_data!.ipinfo.region || "Unknown",
+          scanned_at: s.created_at,
+        }));
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-8 mt-6">
@@ -218,7 +231,12 @@ export default function Dashboard() {
                 <span className="text-emerald-400 font-semibold">Green</span> = safe.
               </p>
             </div>
-            <span className="text-[10px] text-on-surface-variant font-mono-sm uppercase">Live Telemetry</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded font-mono-sm uppercase">
+                📍 {mapPoints.length} Mapped Nodes
+              </span>
+              <span className="text-[10px] text-on-surface-variant font-mono-sm uppercase">Live Telemetry</span>
+            </div>
           </div>
           <div className="h-[350px] relative">
             <GlobalMap points={mapPoints} />
@@ -339,41 +357,81 @@ export default function Dashboard() {
         </div>
 
         {/* Right 1 Span: Incident Alert Center */}
-        <div className="glass-panel p-lg rounded-xl flex flex-col justify-between max-h-[300px]">
-          <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-4 shrink-0">
+        <div className="glass-panel p-lg rounded-xl flex flex-col justify-between max-h-[350px]">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3 shrink-0">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[20px]">notifications_active</span>
               <h3 className="font-bold text-white text-md font-headline-sm">Alert Center</h3>
             </div>
-            <span className="text-[10px] bg-error-container/20 text-error px-2 py-0.5 border border-error-container/30 rounded font-mono-sm uppercase">
-              {stats.alerts.length} Incidents
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-error-container/20 text-error px-2 py-0.5 border border-error-container/30 rounded font-mono-sm uppercase">
+                {stats.alerts.length} Active
+              </span>
+              {stats.alerts.length > 0 && (
+                <button
+                  onClick={handleClearAllAlerts}
+                  disabled={clearAllMutation.isPending}
+                  className="text-[10px] text-on-surface-variant hover:text-white bg-white/5 hover:bg-white/10 px-2 py-0.5 border border-white/10 rounded font-mono-sm transition-all"
+                >
+                  CLEAR ALL
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-3 overflow-y-auto pr-1 hide-scrollbar">
+          <div className="space-y-3 overflow-y-auto pr-1 hide-scrollbar flex-1">
             {stats.alerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-on-surface-variant/40 space-y-2">
+              <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant/40 space-y-2">
                 <CheckCircle size={36} className="text-primary/40 animate-pulse" />
                 <p className="text-[10px] font-mono-sm text-center">ALL WATCHLIST REPUTATIONS STABLE</p>
+                <p className="text-[10px] text-on-surface-variant/30 text-center">No active threat alerts triggered</p>
               </div>
             ) : (
-              stats.alerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="p-3 bg-surface-container-low border border-white/5 rounded-lg flex flex-col gap-2 hover:border-white/10 transition-all"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-bold text-white font-headline-sm leading-tight">{alert.title}</span>
-                    <button
-                      onClick={() => handleDismissAlert(alert.id)}
-                      className="p-1 hover:bg-white/5 rounded text-on-surface-variant hover:text-white transition-all text-[10px] font-mono-sm"
-                    >
-                      DISMISS
-                    </button>
+              stats.alerts.map((alert) => {
+                const isCritical = alert.risk_score >= 70 || alert.alert_type === "CRITICAL_THREAT";
+                const isSuspicious = alert.risk_score >= 35 && !isCritical;
+                
+                return (
+                  <div
+                    key={alert.id}
+                    className={`p-3 rounded-lg border flex flex-col gap-2 transition-all ${
+                      isCritical
+                        ? "bg-red-500/10 border-red-500/30 hover:border-red-500/50"
+                        : isSuspicious
+                        ? "bg-yellow-500/10 border-yellow-500/30 hover:border-yellow-500/50"
+                        : "bg-surface-container-low border-white/10 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[9px] font-bold font-mono-sm uppercase px-1.5 py-0.2 rounded border ${
+                            isCritical ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                            isSuspicious ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                            'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                          }`}>
+                            {alert.alert_type || (isCritical ? 'CRITICAL' : 'SUSPICIOUS')}
+                          </span>
+                          <span className="text-[10px] font-mono-sm text-on-surface-variant">
+                            Score: <strong className={isCritical ? 'text-red-400' : 'text-yellow-400'}>{alert.risk_score}/100</strong>
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold text-white font-headline-sm leading-tight block">
+                          {alert.title}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDismissAlert(alert.id)}
+                        className="p-1 hover:bg-white/10 rounded text-on-surface-variant hover:text-white transition-all text-[10px] font-mono-sm shrink-0"
+                        title="Dismiss Alert"
+                      >
+                        DISMISS
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-on-surface-variant line-clamp-2 leading-snug">{alert.message}</p>
                   </div>
-                  <p className="text-xs text-on-surface-variant line-clamp-2">{alert.message}</p>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

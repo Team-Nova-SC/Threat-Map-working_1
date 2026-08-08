@@ -151,3 +151,4 @@ class DashboardStats(BaseModel):
     alerts: List[AlertResponse]
     threat_distribution: Dict[str, int] # e.g. {"critical": 25, "high": 35, "medium": 30, "low": 10}
     malware_prevalence: List[Dict[str, Any]] # e.g. [{"name": "Ransom.LockBit", "percentage": 82, "trend": "up"}]
+    map_points: Optional[List[Dict[str, Any]]] = None

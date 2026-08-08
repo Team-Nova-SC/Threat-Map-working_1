@@ -163,3 +163,9 @@ def update_alert(alert_id: int, payload: AlertUpdate, db: Session = Depends(get_
     db.commit()
     db.refresh(alert)
     return alert
+
+@router.post("/alerts/clear-all")
+def clear_all_alerts(db: Session = Depends(get_db)):
+    db.query(Alert).filter(Alert.is_dismissed == False).update({"is_dismissed": True})
+    db.commit()
+    return {"status": "success", "message": "All active alerts acknowledged and dismissed."}
