@@ -38,6 +38,63 @@ const LEVEL_LABEL: Record<string, string> = {
   LOW:      "🟢 LOW — Safe",
 };
 
+// Helper function to add/update circle markers onto Leaflet LayerGroup
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderMarkers(L: any, markersGroup: any, pointsList: GlobalMapPoint[]) {
+  if (!L || !markersGroup) return;
+
+  try {
+    markersGroup.clearLayers();
+
+    pointsList.forEach((pt) => {
+      if (!pt || typeof pt.lat !== "number" || typeof pt.lon !== "number") return;
+
+      const color = LEVEL_COLORS[pt.level] || "#64748b";
+      const glow  = LEVEL_GLOW[pt.level]   || "#94a3b8";
+      const label = LEVEL_LABEL[pt.level]   || pt.level;
+
+      const scanDate = pt.scanned_at
+        ? new Date(pt.scanned_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : "Unknown";
+
+      const popupHtml = `
+        <div style="font-family:monospace;font-size:11px;color:#e2e8f0;min-width:200px;line-height:1.8;">
+          <div style="font-weight:bold;color:${color};font-size:12px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">${label}</div>
+          ${pt.indicator ? `<div><span style="color:#94a3b8;">IP / Domain: </span><b>${pt.indicator}</b></div>` : ""}
+          ${pt.risk_score !== undefined ? `<div><span style="color:#94a3b8;">Risk Score: </span><b style="color:${color};">${pt.risk_score}/100</b></div>` : ""}
+          ${pt.country ? `<div><span style="color:#94a3b8;">Country: </span><b>${pt.country}</b></div>` : ""}
+          <div><span style="color:#94a3b8;">Location: </span>${pt.label}</div>
+          <div><span style="color:#94a3b8;">Scanned: </span>${scanDate}</div>
+        </div>`;
+
+      // Inner filled marker
+      const marker = L.circleMarker([pt.lat, pt.lon], {
+        radius: 7,
+        fillColor: color,
+        color: glow,
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.9,
+      }).bindPopup(popupHtml, { className: "globalmap-popup" });
+
+      // Outer pulse ring
+      const pulseRing = L.circleMarker([pt.lat, pt.lon], {
+        radius: 16,
+        fillColor: "transparent",
+        color: color,
+        weight: 1,
+        opacity: 0.3,
+        fillOpacity: 0,
+      });
+
+      markersGroup.addLayer(marker);
+      markersGroup.addLayer(pulseRing);
+    });
+  } catch (err) {
+    console.warn("Leaflet markers render safe catch:", err);
+  }
+}
+
 export const GlobalMap: React.FC<GlobalMapProps> = ({ points }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,6 +155,9 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ points }) => {
           const markersGroup = L.layerGroup().addTo(map);
           markersLayerRef.current = markersGroup;
 
+          // Immediately draw markers as soon as Leaflet loads!
+          renderMarkers(L, markersGroup, activePoints);
+
           setTimeout(() => {
             if (mapInstanceRef.current) {
               try {
@@ -126,56 +186,17 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ points }) => {
         } catch (_) {}
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2. Dynamically update markers without tearing down the map
+  // 2. Dynamically update markers whenever pointsKey updates
   useEffect(() => {
     const L = leafletLRef.current;
     const markersGroup = markersLayerRef.current;
-    if (!L || !markersGroup || !mapInstanceRef.current) return;
-
-    try {
-      markersGroup.clearLayers();
-
-      activePoints.forEach((pt) => {
-        if (!pt || typeof pt.lat !== "number" || typeof pt.lon !== "number") return;
-
-        const color = LEVEL_COLORS[pt.level] || "#64748b";
-        const glow  = LEVEL_GLOW[pt.level]   || "#94a3b8";
-        const label = LEVEL_LABEL[pt.level]   || pt.level;
-
-        const scanDate = pt.scanned_at
-          ? new Date(pt.scanned_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-          : "Unknown";
-
-        const popupHtml = `
-          <div style="font-family:monospace;font-size:11px;color:#e2e8f0;min-width:200px;line-height:1.8;">
-            <div style="font-weight:bold;color:${color};font-size:12px;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:4px;">${label}</div>
-            ${pt.indicator ? `<div><span style="color:#94a3b8;">IP / Domain: </span><b>${pt.indicator}</b></div>` : ""}
-            ${pt.risk_score !== undefined ? `<div><span style="color:#94a3b8;">Risk Score: </span><b style="color:${color};">${pt.risk_score}/100</b></div>` : ""}
-            ${pt.country ? `<div><span style="color:#94a3b8;">Country: </span><b>${pt.country}</b></div>` : ""}
-            <div><span style="color:#94a3b8;">Location: </span>${pt.label}</div>
-            <div><span style="color:#94a3b8;">Scanned: </span>${scanDate}</div>
-          </div>`;
-
-        // Inner filled marker
-        const marker = L.circleMarker([pt.lat, pt.lon], {
-          radius: 7, fillColor: color, color: glow,
-          weight: 2, opacity: 1, fillOpacity: 0.9,
-        }).bindPopup(popupHtml, { className: "globalmap-popup" });
-
-        // Outer pulse ring
-        const pulseRing = L.circleMarker([pt.lat, pt.lon], {
-          radius: 16, fillColor: "transparent",
-          color: color, weight: 1, opacity: 0.3, fillOpacity: 0,
-        });
-
-        markersGroup.addLayer(marker);
-        markersGroup.addLayer(pulseRing);
-      });
-    } catch (err) {
-      console.warn("Leaflet markers update safe catch:", err);
+    if (L && markersGroup && mapInstanceRef.current) {
+      renderMarkers(L, markersGroup, activePoints);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsKey]);
 
   return (
