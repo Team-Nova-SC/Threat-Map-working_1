@@ -56,11 +56,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       icon: <span className="material-symbols-outlined text-[20px]">biotech</span>,
     },
     {
-      name: "Deep OSINT",
-      href: "/deep-scan",
-      icon: <span className="material-symbols-outlined text-[20px]">troubleshoot</span>,
-    },
-    {
       name: "Dashboard",
       href: "/dashboard",
       icon: <span className="material-symbols-outlined text-[20px]">analytics</span>,

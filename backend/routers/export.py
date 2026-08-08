@@ -11,7 +11,7 @@ from models.database import get_db, Scan, Watchlist
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/export", tags=["Export Reports"])
@@ -68,7 +68,7 @@ def _export_csv(scan: Scan):
     writer.writerow(["Risk Score", scan.risk_score])
     writer.writerow(["Risk Level", scan.risk_level])
     writer.writerow(["Summary", scan.summary])
-    writer.writerow(["Created At", scan.created_at.isoformat() if scan.created_at else ""])
+    writer.writerow(["Scan Date (UTC)", scan.created_at.isoformat() if scan.created_at else ""])
     
     raw_data = scan.raw_data or {}
     vt = raw_data.get("virustotal", {})
@@ -114,7 +114,7 @@ def _export_pdf(scan: Scan):
     title_style = ParagraphStyle(
         'DocTitle',
         parent=styles['Heading1'],
-        fontSize=20,
+        fontSize=18,
         textColor=TEXT_WHITE,
         spaceAfter=4,
         fontName='Helvetica-Bold'
@@ -123,18 +123,18 @@ def _export_pdf(scan: Scan):
     subtitle_style = ParagraphStyle(
         'DocSubTitle',
         parent=styles['Normal'],
-        fontSize=10,
+        fontSize=9.5,
         textColor=PRIMARY_CYAN,
-        spaceAfter=14,
+        spaceAfter=12,
         fontName='Helvetica'
     )
     
     section_heading = ParagraphStyle(
         'SectionHeading',
         parent=styles['Heading2'],
-        fontSize=12,
+        fontSize=11.5,
         textColor=PRIMARY_CYAN,
-        spaceBefore=14,
+        spaceBefore=10,
         spaceAfter=6,
         fontName='Helvetica-Bold'
     )
@@ -142,28 +142,54 @@ def _export_pdf(scan: Scan):
     body_text = ParagraphStyle(
         'BodyText',
         parent=styles['Normal'],
-        fontSize=9,
+        fontSize=8.5,
         textColor=TEXT_GREY,
         spaceAfter=6,
-        leading=13,
+        leading=12,
         fontName='Helvetica'
+    )
+    
+    table_hdr_style = ParagraphStyle(
+        'TableHdr',
+        parent=styles['Normal'],
+        fontSize=8.5,
+        textColor=PRIMARY_CYAN,
+        fontName='Helvetica-Bold'
+    )
+    
+    table_cell_style = ParagraphStyle(
+        'TableCell',
+        parent=styles['Normal'],
+        fontSize=8,
+        textColor=TEXT_WHITE,
+        leading=11,
+        fontName='Helvetica'
+    )
+    
+    table_cell_mono = ParagraphStyle(
+        'TableCellMono',
+        parent=styles['Normal'],
+        fontSize=7.5,
+        textColor=TEXT_WHITE,
+        leading=10,
+        fontName='Courier'
     )
     
     explainer_box_style = ParagraphStyle(
         'ExplainerBox',
         parent=styles['Normal'],
-        fontSize=8,
+        fontSize=7.5,
         textColor=TEXT_MUTED,
-        leading=11,
+        leading=10.5,
         fontName='Helvetica-Oblique'
     )
     
     warning_notice = ParagraphStyle(
         'WarningNotice',
         parent=styles['Normal'],
-        fontSize=8.5,
+        fontSize=8,
         textColor=colors.HexColor("#fca5a5"),
-        leading=12,
+        leading=11.5,
         fontName='Helvetica'
     )
 
@@ -171,23 +197,31 @@ def _export_pdf(scan: Scan):
     
     # Header Banner
     elements.append(Paragraph("<b>THREATMAP</b> | CYBERSECURITY THREAT DOSSIER", title_style))
-    created_str = scan.created_at.strftime('%Y-%m-%d %H:%M UTC') if scan.created_at else datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
-    elements.append(Paragraph(f"REPORT ID: {scan.id} &nbsp;|&nbsp; GENERATED: {created_str} &nbsp;|&nbsp; CLASSIFICATION: TLP:AMBER", subtitle_style))
+    scan_time_str = scan.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') if scan.created_at else "N/A"
+    export_time_str = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    elements.append(Paragraph(f"REPORT ID: {scan.id} &nbsp;|&nbsp; SCAN DATE: {scan_time_str} &nbsp;|&nbsp; EXPORTED: {export_time_str}", subtitle_style))
     
     # Notice Box
-    notice_table = Table([[Paragraph("<b>CONFIDENTIAL THREAT BRIEF:</b> Automated intelligence aggregated across multi-vendor OSINT APIs. Verify critical indicators prior to executing active remediation.", warning_notice)]], colWidths=[540])
+    notice_table = Table([[Paragraph("<b>CONFIDENTIAL THREAT DOSSIER:</b> Real-time threat telemetry aggregated across VirusTotal, AbuseIPDB, AlienVault OTX, URLScan.io, and WHOIS APIs. Verify critical indicators prior to active containment.", warning_notice)]], colWidths=[540])
     notice_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#450a0a")),
         ('BORDER', (0,0), (-1,-1), 1, ALERT_RED),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
         ('LEFTPADDING', (0,0), (-1,-1), 8),
         ('RIGHTPADDING', (0,0), (-1,-1), 8),
     ]))
     elements.append(notice_table)
     elements.append(Spacer(1, 10))
     
-    # Helper to add Explainer Box
+    # Helper to build robust table cells that wrap text
+    def wrap_cell(val, is_key=False, is_mono=False):
+        if is_key:
+            return Paragraph(f"<b>{val}</b>", table_hdr_style)
+        st = table_cell_mono if is_mono else table_cell_style
+        return Paragraph(str(val), st)
+
+    # Helper to build Explainer Box
     def build_explainer(title: str, what_why: str, missing_reason: str):
         content = [
             Paragraph(f"<b>[EXPLAINER & PROVENANCE]</b> <i>{title}</i>", ParagraphStyle('ExpTitle', parent=explainer_box_style, textColor=PRIMARY_CYAN, fontName='Helvetica-Bold')),
@@ -206,79 +240,78 @@ def _export_pdf(scan: Scan):
         return t
 
     # SECTION 1: Target Overview
-    elements.append(Paragraph("I. Executive Target Summary & Risk Rating", section_heading))
-    risk_color = ALERT_RED if scan.risk_score >= 70 else (colors.HexColor("#f59e0b") if scan.risk_score >= 35 else ALERT_GREEN)
+    s1_elements = []
+    s1_elements.append(Paragraph("I. Executive Target Summary & Risk Rating", section_heading))
     
     target_info = [
-        ["Indicator Target:", scan.indicator, "Target Type:", scan.type.upper()],
-        ["Scan ID:", scan.id, "Timestamp:", created_str],
-        ["Threat Risk Score:", f"{scan.risk_score} / 100", "Verdict Level:", scan.risk_level.upper() if scan.risk_level else ("HIGH" if scan.risk_score>=70 else "CLEAN")]
+        [wrap_cell("Indicator Target:", True), wrap_cell(scan.indicator, is_mono=True), wrap_cell("Target Type:", True), wrap_cell(scan.type.upper())],
+        [wrap_cell("Scan ID:", True), wrap_cell(scan.id, is_mono=True), wrap_cell("Scan Date (UTC):", True), wrap_cell(scan_time_str)],
+        [wrap_cell("Threat Risk Score:", True), wrap_cell(f"{scan.risk_score} / 100"), wrap_cell("Verdict Level:", True), wrap_cell(scan.risk_level.upper() if scan.risk_level else ("HIGH" if scan.risk_score>=70 else "CLEAN"))]
     ]
     
-    t_info = Table(target_info, colWidths=[110, 160, 110, 160])
+    t_info = Table(target_info, colWidths=[105, 165, 105, 165])
     t_info.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
-        ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
-        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
         ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
-        ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
-        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
         ('BACKGROUND', (1,0), (1,-1), BG_CARD),
-        ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
         ('BACKGROUND', (3,0), (3,-1), BG_CARD),
-        ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
-        ('FONTSIZE', (0,0), (-1,-1), 9),
         ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
-    elements.append(t_info)
-    elements.append(Spacer(1, 4))
-    elements.append(build_explainer(
+    s1_elements.append(t_info)
+    s1_elements.append(Spacer(1, 4))
+    s1_elements.append(build_explainer(
         "ThreatMap Risk Engine Scoring Model",
         "Calculated deterministically using multi-vendor engine consensus weights (VirusTotal 90+ vendors, AbuseIPDB reputation, AlienVault OTX community pulses, and URLScan sandbox verdicts).",
         "If risk score is 0, no commercial security vendor or threat intelligence feed has flagged this target as malicious."
     ))
+    elements.append(KeepTogether(s1_elements))
     elements.append(Spacer(1, 10))
 
     # SECTION 2: AI Analyst Brief & Playbook
-    elements.append(Paragraph("II. AI Threat Intelligence Brief & Remediation Playbook", section_heading))
+    s2_elements = []
+    s2_elements.append(Paragraph("II. AI Threat Intelligence Brief & Remediation Playbook", section_heading))
     raw = scan.raw_data or {}
     ai_raw = raw.get("ai_summary", {})
     
     summary_text = scan.summary or (ai_raw.get("summary") if isinstance(ai_raw, dict) else "No AI summary generated for this indicator.")
-    elements.append(Paragraph(f"<b>Executive Summary:</b> {summary_text}", body_text))
+    s2_elements.append(Paragraph(f"<b>Executive Summary:</b> {summary_text}", body_text))
     
     playbook_steps = ai_raw.get("playbook", []) if isinstance(ai_raw, dict) else []
     if playbook_steps and len(playbook_steps) > 0:
-        elements.append(Paragraph("<b>Recommended SOC Remediation Playbook:</b>", ParagraphStyle('SubH', parent=body_text, fontName='Helvetica-Bold', textColor=TEXT_WHITE)))
+        s2_elements.append(Paragraph("<b>Recommended SOC Remediation Playbook:</b>", ParagraphStyle('SubH', parent=body_text, fontName='Helvetica-Bold', textColor=TEXT_WHITE)))
         pb_table_data = []
         for idx, step in enumerate(playbook_steps, 1):
-            pb_table_data.append([f"Step {idx}", step])
-        pb_table = Table(pb_table_data, colWidths=[60, 480])
+            pb_table_data.append([wrap_cell(f"Step {idx}", True), wrap_cell(step)])
+        pb_table = Table(pb_table_data, colWidths=[55, 485])
         pb_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (0,-1), colors.HexColor("#2a1215")),
-            ('TEXTCOLOR', (0,0), (0,-1), ALERT_RED),
-            ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
             ('BACKGROUND', (1,0), (1,-1), BG_CARD),
-            ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
-            ('FONTSIZE', (0,0), (-1,-1), 8.5),
             ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('TOPPADDING', (0,0), (-1,-1), 4),
             ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 6),
+            ('RIGHTPADDING', (0,0), (-1,-1), 6),
         ]))
-        elements.append(pb_table)
+        s2_elements.append(pb_table)
     
-    elements.append(Spacer(1, 4))
-    elements.append(build_explainer(
+    s2_elements.append(Spacer(1, 4))
+    s2_elements.append(build_explainer(
         "AI Analyst Brief & Mitigation Playbook",
         "Synthesizes cross-vendor threat telemetry into non-hallucinated, structured executive summaries and SOC action plans.",
         "If missing or minimal, the LLM provider API was unreachable or raw telemetry had insufficient threat markers to generate actionable playbooks."
     ))
+    elements.append(KeepTogether(s2_elements))
     elements.append(Spacer(1, 10))
 
     # SECTION 3: VirusTotal Deep Inspection
-    elements.append(Paragraph("III. VirusTotal Commercial Antivirus Consensus (90+ Vendors)", section_heading))
+    s3_elements = []
+    s3_elements.append(Paragraph("III. VirusTotal Commercial Antivirus Consensus (90+ Vendors)", section_heading))
     vt = raw.get("virustotal", {})
     if vt and isinstance(vt, dict):
         vt_mal = vt.get("malicious", 0)
@@ -288,40 +321,39 @@ def _export_pdf(scan: Scan):
         vt_total = vt_mal + vt_sus + vt_harm + vt_und
         
         vt_summary = [
-            ["Malicious Detections", f"{vt_mal} / {vt_total} vendors", "Harmless Verdicts", f"{vt_harm} vendors"],
-            ["Suspicious Verdicts", f"{vt_sus} vendors", "Undetected Engines", f"{vt_und} vendors"]
+            [wrap_cell("Malicious Detections:", True), wrap_cell(f"{vt_mal} / {vt_total} vendors"), wrap_cell("Harmless Verdicts:", True), wrap_cell(f"{vt_harm} vendors")],
+            [wrap_cell("Suspicious Verdicts:", True), wrap_cell(f"{vt_sus} vendors"), wrap_cell("Undetected Engines:", True), wrap_cell(f"{vt_und} vendors")]
         ]
-        vt_table = Table(vt_summary, colWidths=[130, 140, 130, 140])
+        vt_table = Table(vt_summary, colWidths=[115, 155, 115, 155])
         vt_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
-            ('TEXTCOLOR', (0,0), (0,-1), ALERT_RED if vt_mal > 0 else ACCENT_TEAL),
-            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
             ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
-            ('TEXTCOLOR', (2,0), (2,-1), ACCENT_TEAL),
             ('BACKGROUND', (1,0), (1,-1), BG_CARD),
-            ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
             ('BACKGROUND', (3,0), (3,-1), BG_CARD),
-            ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
-            ('FONTSIZE', (0,0), (-1,-1), 8.5),
             ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 5),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 6),
+            ('RIGHTPADDING', (0,0), (-1,-1), 6),
         ]))
-        elements.append(vt_table)
+        s3_elements.append(vt_table)
     else:
-        elements.append(Paragraph("<i>No VirusTotal record found for this target.</i>", body_text))
+        s3_elements.append(Paragraph("<i>No VirusTotal record found for this target.</i>", body_text))
 
-    elements.append(Spacer(1, 4))
-    elements.append(build_explainer(
+    s3_elements.append(Spacer(1, 4))
+    s3_elements.append(build_explainer(
         "VirusTotal Multi-Vendor AV Telemetry",
         "Aggregates detection status across 90+ antivirus products, web security scanners, and domain/IP reputation databases.",
         "0 detections indicates clean status across commercial AV engines, or indicator is not indexed by VirusTotal."
     ))
+    elements.append(KeepTogether(s3_elements))
     elements.append(Spacer(1, 10))
 
     # SECTION 4: AbuseIPDB Telemetry (For IPs)
     if scan.type == "ip":
-        elements.append(Paragraph("IV. AbuseIPDB Forensic Abuse & Reputation Records", section_heading))
+        s4_elements = []
+        s4_elements.append(Paragraph("IV. AbuseIPDB Forensic Abuse & Reputation Records", section_heading))
         abuse = raw.get("abuseipdb", {})
         if abuse and isinstance(abuse, dict):
             ab_score = abuse.get("abuseConfidenceScore", 0)
@@ -331,39 +363,38 @@ def _export_pdf(scan: Scan):
             ab_usage = abuse.get("usageType", "N/A")
             
             ab_data = [
-                ["Abuse Confidence Score:", f"{ab_score}%", "Total Reported Incidents:", str(ab_reports)],
-                ["Network ISP:", ab_isp, "Country Code / Usage:", f"{ab_country} ({ab_usage})"]
+                [wrap_cell("Abuse Score:", True), wrap_cell(f"{ab_score}%"), wrap_cell("Total Incidents:", True), wrap_cell(str(ab_reports))],
+                [wrap_cell("Network ISP:", True), wrap_cell(ab_isp), wrap_cell("Country / Usage:", True), wrap_cell(f"{ab_country} ({ab_usage})")]
             ]
-            ab_table = Table(ab_data, colWidths=[130, 140, 130, 140])
+            ab_table = Table(ab_data, colWidths=[115, 155, 115, 155])
             ab_table.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
-                ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
-                ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
                 ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
-                ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
                 ('BACKGROUND', (1,0), (1,-1), BG_CARD),
-                ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
                 ('BACKGROUND', (3,0), (3,-1), BG_CARD),
-                ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
-                ('FONTSIZE', (0,0), (-1,-1), 8.5),
                 ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
-                ('TOPPADDING', (0,0), (-1,-1), 5),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ('LEFTPADDING', (0,0), (-1,-1), 6),
+                ('RIGHTPADDING', (0,0), (-1,-1), 6),
             ]))
-            elements.append(ab_table)
+            s4_elements.append(ab_table)
         else:
-            elements.append(Paragraph("<i>No AbuseIPDB reports recorded for this IP address.</i>", body_text))
+            s4_elements.append(Paragraph("<i>No AbuseIPDB reports recorded for this IP address.</i>", body_text))
 
-        elements.append(Spacer(1, 4))
-        elements.append(build_explainer(
+        s4_elements.append(Spacer(1, 4))
+        s4_elements.append(build_explainer(
             "AbuseIPDB Crowd-Sourced IP Tracking",
             "Monitors real-time web server logs, SSH brute-force attempts, spam distribution, and port scanning reports.",
             "0% score indicates no malicious reports submitted by system administrators in the past 90 days."
         ))
+        elements.append(KeepTogether(s4_elements))
         elements.append(Spacer(1, 10))
 
     # SECTION 5: AlienVault OTX Threat Feeds
-    elements.append(Paragraph("V. AlienVault OTX (Open Threat Exchange) Feeds & ATT&CK", section_heading))
+    s5_elements = []
+    s5_elements.append(Paragraph("V. AlienVault OTX (Open Threat Exchange) Feeds & ATT&CK", section_heading))
     otx = raw.get("alienvault", {})
     if otx and isinstance(otx, dict):
         pulse_count = otx.get("pulse_count", 0)
@@ -371,40 +402,39 @@ def _export_pdf(scan: Scan):
         attack = otx.get("attack_ids", [])
         
         otx_data = [
-            ["Community Threat Pulses:", f"{pulse_count} Pulses", "Associated Malware:", ", ".join(malware[:3]) if malware else "None"],
-            ["MITRE ATT&CK Techniques:", f"{len(attack)} TTPs" if attack else "None", "OTX Status:", "ACTIVE FEEDS" if pulse_count > 0 else "CLEAN"]
+            [wrap_cell("Threat Pulses:", True), wrap_cell(f"{pulse_count} Pulses"), wrap_cell("Associated Malware:", True), wrap_cell(", ".join(malware[:3]) if malware else "None")],
+            [wrap_cell("MITRE ATT&CK:", True), wrap_cell(f"{len(attack)} TTPs" if attack else "None"), wrap_cell("OTX Status:", True), wrap_cell("ACTIVE FEEDS" if pulse_count > 0 else "CLEAN")]
         ]
-        otx_table = Table(otx_data, colWidths=[130, 140, 130, 140])
+        otx_table = Table(otx_data, colWidths=[115, 155, 115, 155])
         otx_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
-            ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
-            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
             ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
-            ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
             ('BACKGROUND', (1,0), (1,-1), BG_CARD),
-            ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
             ('BACKGROUND', (3,0), (3,-1), BG_CARD),
-            ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
-            ('FONTSIZE', (0,0), (-1,-1), 8.5),
             ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0,0), (-1,-1), 5),
-            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 6),
+            ('RIGHTPADDING', (0,0), (-1,-1), 6),
         ]))
-        elements.append(otx_table)
+        s5_elements.append(otx_table)
     else:
-        elements.append(Paragraph("<i>No AlienVault OTX threat pulses associated with this target.</i>", body_text))
+        s5_elements.append(Paragraph("<i>No AlienVault OTX threat pulses associated with this target.</i>", body_text))
 
-    elements.append(Spacer(1, 4))
-    elements.append(build_explainer(
+    s5_elements.append(Spacer(1, 4))
+    s5_elements.append(build_explainer(
         "AlienVault OTX Global Threat Exchange",
         "Tracks adversary campaign reports (Pulses), targeted industries, malware hashes, and MITRE ATT&CK techniques.",
         "0 pulses indicates no security analyst has published a threat report referencing this specific indicator."
     ))
+    elements.append(KeepTogether(s5_elements))
     elements.append(Spacer(1, 10))
 
     # SECTION 6: URLScan.io Sandbox Telemetry (For Domains & URLs)
     if scan.type == "domain" or scan.type == "url":
-        elements.append(Paragraph("VI. URLScan.io Sandbox Telemetry & Web Footprint", section_heading))
+        s6_elements = []
+        s6_elements.append(Paragraph("VI. URLScan.io Sandbox Telemetry & Web Footprint", section_heading))
         urlscan = raw.get("urlscan", {})
         if urlscan and isinstance(urlscan, dict) and urlscan.get("scan_id"):
             u_verdict = urlscan.get("verdicts", {}).get("overall", {})
@@ -415,40 +445,39 @@ def _export_pdf(scan: Scan):
             u_url = urlscan.get("final_url", scan.indicator)
             
             u_data = [
-                ["Sandbox Verdict:", "MALICIOUS" if u_mal else f"CLEAN (Score: {u_score})", "Server Software:", u_server[:25]],
-                ["Captured Title:", u_title[:30], "Landed URL:", u_url[:35]]
+                [wrap_cell("Sandbox Verdict:", True), wrap_cell("MALICIOUS" if u_mal else f"CLEAN (Score: {u_score})"), wrap_cell("Server Software:", True), wrap_cell(u_server)],
+                [wrap_cell("Page Title:", True), wrap_cell(u_title), wrap_cell("Landed URL:", True), wrap_cell(u_url, is_mono=True)]
             ]
-            u_table = Table(u_data, colWidths=[130, 140, 130, 140])
+            u_table = Table(u_data, colWidths=[115, 155, 115, 155])
             u_table.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
-                ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
-                ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
                 ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
-                ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
                 ('BACKGROUND', (1,0), (1,-1), BG_CARD),
-                ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
                 ('BACKGROUND', (3,0), (3,-1), BG_CARD),
-                ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
-                ('FONTSIZE', (0,0), (-1,-1), 8.5),
                 ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
-                ('TOPPADDING', (0,0), (-1,-1), 5),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ('LEFTPADDING', (0,0), (-1,-1), 6),
+                ('RIGHTPADDING', (0,0), (-1,-1), 6),
             ]))
-            elements.append(u_table)
+            s6_elements.append(u_table)
         else:
-            elements.append(Paragraph("<i>No public urlscan.io sandbox scan logged for this target.</i>", body_text))
+            s6_elements.append(Paragraph("<i>No public urlscan.io sandbox scan logged for this target.</i>", body_text))
 
-        elements.append(Spacer(1, 4))
-        elements.append(build_explainer(
+        s6_elements.append(Spacer(1, 4))
+        s6_elements.append(build_explainer(
             "URLScan.io Headless Browser Telemetry",
             "Executes headless browser sandbox sessions capturing live DOM tree, network request logs, technologies, and screenshots.",
             "If not logged, no automated public scan has been executed on urlscan.io for this specific web endpoint."
         ))
+        elements.append(KeepTogether(s6_elements))
         elements.append(Spacer(1, 10))
 
-    # SECTION 7: OSINT WHOIS & DNS Infrastructure
+    # SECTION 7: OSINT WHOIS & Domain Infrastructure
     if scan.type == "domain":
-        elements.append(Paragraph("VII. OSINT WHOIS & Domain Infrastructure", section_heading))
+        s7_elements = []
+        s7_elements.append(Paragraph("VII. OSINT WHOIS & Domain Infrastructure", section_heading))
         whois = raw.get("whoisjson", {})
         if whois and isinstance(whois, dict):
             reg = whois.get("registrar_metadata", {}).get("name", "Unknown Registrar")
@@ -457,40 +486,38 @@ def _export_pdf(scan: Scan):
             expires = dates.get("expiration_date", "Unknown")
             
             w_data = [
-                ["Domain Registrar:", reg[:25], "Creation Date:", created[:15]],
-                ["Expiration Date:", expires[:15], "Status:", "RECORDS RETRIEVED"]
+                [wrap_cell("Domain Registrar:", True), wrap_cell(reg), wrap_cell("Creation Date:", True), wrap_cell(created)],
+                [wrap_cell("Expiration Date:", True), wrap_cell(expires), wrap_cell("Status:", True), wrap_cell("RECORDS RETRIEVED")]
             ]
-            w_table = Table(w_data, colWidths=[130, 140, 130, 140])
+            w_table = Table(w_data, colWidths=[115, 155, 115, 155])
             w_table.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
-                ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
-                ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
                 ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
-                ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
                 ('BACKGROUND', (1,0), (1,-1), BG_CARD),
-                ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
                 ('BACKGROUND', (3,0), (3,-1), BG_CARD),
-                ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
-                ('FONTSIZE', (0,0), (-1,-1), 8.5),
                 ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
-                ('TOPPADDING', (0,0), (-1,-1), 5),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ('TOPPADDING', (0,0), (-1,-1), 4),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                ('LEFTPADDING', (0,0), (-1,-1), 6),
+                ('RIGHTPADDING', (0,0), (-1,-1), 6),
             ]))
-            elements.append(w_table)
+            s7_elements.append(w_table)
         else:
-            elements.append(Paragraph("<i>WHOIS records unavailable or privacy-protected.</i>", body_text))
+            s7_elements.append(Paragraph("<i>WHOIS records unavailable or privacy-protected.</i>", body_text))
 
-        elements.append(Spacer(1, 4))
-        elements.append(build_explainer(
+        s7_elements.append(Spacer(1, 4))
+        s7_elements.append(build_explainer(
             "ICANN WHOIS Domain Registration Records",
             "Provides domain age, registrar authority, expiration dates, and owner metadata for risk assessment.",
             "If missing, domain registry server rate-limited requests or WHOIS privacy protection obfuscated registration data."
         ))
+        elements.append(KeepTogether(s7_elements))
         elements.append(Spacer(1, 10))
 
     # SECTION 8: Vendor Provenance Footer
-    elements.append(Spacer(1, 10))
-    elements.append(Paragraph("<b>PROVENANCE DISCLAIMER & METHODOLOGY:</b> This threat report was generated by ThreatMap Platform v2.0. Telemetry data is fetched via asynchronous API calls directly from vendor backends. Third-party findings must be validated prior to implementing firewall blocklists or SOC containment actions.", ParagraphStyle('FootNote', parent=body_text, fontSize=7.5, textColor=TEXT_MUTED, leading=10)))
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph("<b>PROVENANCE DISCLAIMER & METHODOLOGY:</b> This threat dossier was generated by ThreatMap Platform v2.0. Telemetry data is fetched asynchronously directly from vendor API backends. Third-party findings must be manually validated prior to implementing firewall blocklists or SOC containment actions.", ParagraphStyle('FootNote', parent=body_text, fontSize=7.5, textColor=TEXT_MUTED, leading=10)))
 
     # Dark background canvas callback
     def add_pdf_decorations(canvas, doc):
@@ -501,15 +528,15 @@ def _export_pdf(scan: Scan):
         
         # Header accent bar
         canvas.setFillColor(BG_HEADER)
-        canvas.rect(0, doc.pagesize[1] - 50, doc.pagesize[0], 50, fill=1, stroke=0)
+        canvas.rect(0, doc.pagesize[1] - 45, doc.pagesize[0], 45, fill=1, stroke=0)
         canvas.setFillColor(PRIMARY_CYAN)
-        canvas.rect(0, doc.pagesize[1] - 50, doc.pagesize[0], 2, fill=1, stroke=0)
+        canvas.rect(0, doc.pagesize[1] - 45, doc.pagesize[0], 2, fill=1, stroke=0)
         
         # Footer text
         canvas.setFillColor(TEXT_MUTED)
         canvas.setFont("Helvetica-Bold", 8)
-        canvas.drawString(36, 20, "THREATMAP CYBERSECURITY | INTELLIGENCE DOSSIER")
-        canvas.drawRightString(doc.pagesize[0] - 36, 20, f"Page {doc.page}")
+        canvas.drawString(36, 18, "THREATMAP CYBERSECURITY | INTELLIGENCE DOSSIER")
+        canvas.drawRightString(doc.pagesize[0] - 36, 18, f"Page {doc.page}")
         canvas.restoreState()
 
     doc.build(elements, onFirstPage=add_pdf_decorations, onLaterPages=add_pdf_decorations)
