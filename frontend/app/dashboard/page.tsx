@@ -109,20 +109,24 @@ export default function Dashboard() {
     clearAllMutation.mutate();
   };
 
-  const mapPoints: GlobalMapPoint[] = (stats.map_points && stats.map_points.length > 0)
+  const safeMapPoints = (stats?.map_points && Array.isArray(stats.map_points) && stats.map_points.length > 0)
     ? stats.map_points
-    : stats.recent_scans
-        .filter((s) => s.raw_data && s.raw_data.ipinfo && s.raw_data.ipinfo.lat && s.raw_data.ipinfo.lon)
+    : (stats?.recent_scans || [])
+        .filter((s) => s && s.raw_data && s.raw_data.ipinfo && s.raw_data.ipinfo.lat && s.raw_data.ipinfo.lon)
         .map((s) => ({
           lat:        s.raw_data!.ipinfo.lat,
           lon:        s.raw_data!.ipinfo.lon,
           label:      `${s.indicator} (${s.raw_data!.ipinfo.city || "Unknown"})`,
-          level:      s.risk_level,
-          indicator:  s.indicator,
-          risk_score: s.risk_score,
+          level:      s.risk_level || "LOW",
+          indicator:  s.indicator || "",
+          risk_score: s.risk_score || 0,
           country:    s.raw_data!.ipinfo.country || s.raw_data!.ipinfo.region || "Unknown",
-          scanned_at: s.created_at,
+          scanned_at: s.created_at || "",
         }));
+
+  const mapPoints: GlobalMapPoint[] = safeMapPoints;
+  const safeAlerts = stats?.alerts || [];
+  const safeRecentScans = stats?.recent_scans || [];
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-8 mt-6">
@@ -352,8 +356,8 @@ export default function Dashboard() {
           </div>
           <div className="flex-1 flex items-center justify-center">
             <ThreatRadar
-              distribution={stats.threat_distribution}
-              totalScans={stats.total_scans_24h}
+              distribution={stats?.threat_distribution || { critical: 0, high: 0, medium: 0, low: 0 }}
+              totalScans={stats?.total_scans_24h || 0}
             />
           </div>
         </div>
@@ -367,9 +371,9 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] bg-error-container/20 text-error px-2 py-0.5 border border-error-container/30 rounded font-mono-sm uppercase">
-                {stats.alerts.length} Active
+                {safeAlerts.length} Active
               </span>
-              {stats.alerts.length > 0 && (
+              {safeAlerts.length > 0 && (
                 <button
                   onClick={handleClearAllAlerts}
                   disabled={clearAllMutation.isPending}
@@ -382,14 +386,14 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-3 overflow-y-auto pr-1 hide-scrollbar flex-1">
-            {stats.alerts.length === 0 ? (
+            {safeAlerts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant/40 space-y-2">
                 <CheckCircle size={36} className="text-primary/40 animate-pulse" />
                 <p className="text-[10px] font-mono-sm text-center">ALL WATCHLIST REPUTATIONS STABLE</p>
                 <p className="text-[10px] text-on-surface-variant/30 text-center">No active threat alerts triggered</p>
               </div>
             ) : (
-              stats.alerts.map((alert) => {
+              safeAlerts.map((alert) => {
                 const isCritical = alert.risk_score >= 70 || alert.alert_type === "CRITICAL_THREAT";
                 const isSuspicious = alert.risk_score >= 35 && !isCritical;
                 
@@ -460,14 +464,14 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-on-surface font-body-sm font-semibold">
-              {stats.recent_scans.length === 0 ? (
+              {safeRecentScans.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-on-surface-variant/40 font-mono-sm">
                     NO HISTORIC IOC SCANS LOGGED
                   </td>
                 </tr>
               ) : (
-                stats.recent_scans.map((scan) => (
+                safeRecentScans.map((scan) => (
                   <tr key={scan.id} className="hover:bg-white/5 transition-all">
                     <td className="py-3 font-mono-md select-all pr-4 truncate max-w-[200px] sm:max-w-xs text-white">
                       {scan.indicator}
@@ -478,7 +482,7 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td className="py-3 text-on-surface-variant">
-                      {new Date(scan.created_at).toLocaleString()}
+                      {scan.created_at ? new Date(scan.created_at).toLocaleString() : "N/A"}
                     </td>
                     <td className="py-3">
                       <RiskBadge level={scan.risk_level} score={scan.risk_score} />

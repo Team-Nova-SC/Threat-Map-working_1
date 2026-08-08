@@ -43,8 +43,8 @@ export const GlobalMap: React.FC<GlobalMapProps> = ({ points }) => {
   const mapInstanceRef = useRef<any>(null);
 
   // Empty input means there is no real geolocated scan data yet.
-  const activePoints = points;
-  const dangerCount  = activePoints.filter(p => p.level === "HIGH" || p.level === "CRITICAL").length;
+  const activePoints = Array.isArray(points) ? points : [];
+  const dangerCount  = activePoints.filter(p => p && (p.level === "HIGH" || p.level === "CRITICAL")).length;
 
   useEffect(() => {
     if (typeof window === "undefined" || !mapRef.current) return;

@@ -29,13 +29,20 @@ function polarToXY(angle: number, radius: number, cx: number, cy: number) {
 }
 
 export default function ThreatRadar({ distribution, totalScans }: ThreatRadarProps) {
-  const secureVal = Math.max(0, 100 - distribution.critical - distribution.high - distribution.medium - distribution.low);
+  const dist = {
+    critical: Number(distribution?.critical) || 0,
+    high:     Number(distribution?.high) || 0,
+    medium:   Number(distribution?.medium) || 0,
+    low:      Number(distribution?.low) || 0,
+  };
+  const totalScansVal = Number(totalScans) || 0;
+  const secureVal = Math.max(0, 100 - dist.critical - dist.high - dist.medium - dist.low);
   const values: Record<string, number> = {
-    critical: distribution.critical,
-    high: distribution.high,
-    medium: distribution.medium,
-    low: distribution.low,
-    secure: secureVal,
+    critical: dist.critical,
+    high:     dist.high,
+    medium:   dist.medium,
+    low:      dist.low,
+    secure:   secureVal,
   };
 
   const cx = 120, cy = 120, R = 90;
@@ -130,7 +137,7 @@ export default function ThreatRadar({ distribution, totalScans }: ThreatRadarPro
         {/* Center label */}
         <circle cx={cx} cy={cy} r={24} fill="rgba(2,6,23,0.8)" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
         <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize="13" fontWeight="bold" fontFamily="JetBrains Mono, monospace">
-          {totalScans}
+          {totalScansVal}
         </text>
         <text x={cx} y={cy + 8} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="6" fontFamily="JetBrains Mono, monospace">
           SCANS
