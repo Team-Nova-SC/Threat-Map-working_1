@@ -10,7 +10,6 @@ import DetectionCard from "@/components/DetectionCard";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
 import AdvancedOsintPanels from "@/components/AdvancedOsintPanels";
 import WebVulnReport from "@/components/WebVulnReport";
-import SpiderfootPanel from "@/components/SpiderfootPanel";
 import CommunityNotes from "@/components/CommunityNotes";
 import DomainScanMetrics from "@/components/DomainScanMetrics";
 import WhoisJsonData from "@/components/WhoisJsonData";
@@ -517,18 +516,42 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
 
       {/* Analytics Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Cell 1: Risk Gauge + Breakdown */}
-        <div className="md:col-span-1 glass-panel p-lg rounded-xl flex flex-col items-center justify-center gap-6 min-h-[300px]">
-          <RiskGauge score={scan.risk_score} feedCount={activeFeedCount} />
+        {/* Cell 1: Risk Gauge + Comprehensive Score & Telemetry Breakdown */}
+        <div className="md:col-span-1 glass-panel p-6 rounded-xl flex flex-col justify-between h-full min-h-[360px] border border-white/10 space-y-4">
+          <div className="flex flex-col items-center justify-center">
+            <RiskGauge score={scan.risk_score} feedCount={activeFeedCount} />
+            
+            {/* Risk Verdict Badge */}
+            <div className="mt-3 flex items-center gap-1.5">
+              <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                scan.risk_score >= 70 ? "bg-rose-500/20 text-rose-300 border-rose-500/30" :
+                scan.risk_score >= 35 ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+              }`}>
+                VERDICT: {scan.risk_level?.toUpperCase() || (scan.risk_score >= 70 ? "HIGH RISK" : scan.risk_score >= 35 ? "SUSPICIOUS" : "CLEAN")}
+              </span>
+            </div>
+          </div>
 
-          {/* Risk Score Breakdown Bar */}
-          <div className="w-full space-y-2.5 border-t border-white/5 pt-4">
-            <p className="text-[10px] font-mono-sm uppercase text-on-surface-variant tracking-wider mb-2">Score Breakdown</p>
+          {/* Detailed Vendor Score Breakdown Bar */}
+          <div className="w-full space-y-2.5 border-t border-white/10 pt-4">
+            <p className="text-[10px] font-mono-sm uppercase text-on-surface-variant tracking-wider mb-2 flex items-center justify-between">
+              <span>Vendor Intelligence Weights</span>
+              <span className="text-primary font-bold">{activeFeedCount} Active Providers</span>
+            </p>
 
             {[
-              { label: "VirusTotal",   desc: "90+ AV engines",  weight: 50, score: vtScore,    color: "bg-primary" },
-              { label: "AbuseIPDB",    desc: "Community abuse", weight: 50, score: abuseScore,  color: "bg-orange-500" },
-            ].filter(engine => scan.type === "ip" || engine.label === "VirusTotal").map((engine) => (
+              { label: "VirusTotal",   desc: "90+ AV Engines",  score: vtScore,    color: "bg-primary" },
+              { label: "AbuseIPDB",    desc: "Reputation Abuse", score: abuseScore,  color: "bg-amber-500" },
+              { label: "AlienVault",   desc: "OTX Pulses",      score: otx.pulse_count ? Math.min(100, otx.pulse_count * 25) : 0, color: "bg-sky-400" },
+              { label: "URLScan.io",   desc: "Sandbox Score",   score: urlscan.verdicts?.overall?.score ?? (urlscan.verdicts?.overall?.malicious ? 100 : 0), color: "bg-rose-400" }
+            ].filter(engine => {
+              if (engine.label === "VirusTotal") return true;
+              if (engine.label === "AbuseIPDB" && scan.type === "ip") return true;
+              if (engine.label === "AlienVault") return true;
+              if (engine.label === "URLScan.io" && (scan.type === "domain" || scan.type === "url")) return true;
+              return false;
+            }).map((engine) => (
               <div key={engine.label}>
                 <div className="flex justify-between text-[10px] font-mono-sm mb-1">
                   <span className="text-on-surface-variant">{engine.label} <span className="opacity-50">({engine.desc})</span></span>
@@ -543,11 +566,24 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
               </div>
             ))}
           </div>
+
+          {/* Quick Engine Telemetry Chips */}
+          <div className="w-full border-t border-white/10 pt-3 flex flex-wrap gap-1.5">
+            <span className="text-[9px] font-mono bg-white/5 border border-white/10 px-2 py-0.5 rounded text-on-surface-variant">
+              90+ Commercial Engines
+            </span>
+            <span className="text-[9px] font-mono bg-white/5 border border-white/10 px-2 py-0.5 rounded text-on-surface-variant">
+              OTX Threat Feeds
+            </span>
+            <span className="text-[9px] font-mono bg-white/5 border border-white/10 px-2 py-0.5 rounded text-on-surface-variant">
+              Deterministic Scoring
+            </span>
+          </div>
           
           {scanHistory.length > 1 && (
-            <div className="w-full space-y-2.5 border-t border-white/5 pt-4">
-              <p className="text-[10px] font-mono-sm uppercase text-on-surface-variant tracking-wider mb-2">IOC Risk Trend</p>
-              <div className="h-[80px] w-full">
+            <div className="w-full space-y-2 border-t border-white/10 pt-3">
+              <p className="text-[10px] font-mono-sm uppercase text-on-surface-variant tracking-wider">IOC Risk Trend</p>
+              <div className="h-[60px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={scanHistory}>
                     <YAxis domain={[0, 100]} hide />
@@ -922,9 +958,6 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       {scan.raw_data?.whoisjson && (
         <WhoisJsonData data={scan.raw_data.whoisjson} />
       )}
-
-      {/* SpiderFoot Deep OSINT Section */}
-      <SpiderfootPanel target={scan.indicator} />
 
       {/* ── Web Security Audit ───────────────────────────── */}
       {webVulnData && (scan.type === "domain" || scan.type === "url") && (

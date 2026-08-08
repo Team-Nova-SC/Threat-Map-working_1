@@ -11,10 +11,7 @@ from models.database import get_db, Scan, Watchlist
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from pydantic import BaseModel
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/export", tags=["Export Reports"])
@@ -39,32 +36,8 @@ def export_report(
     elif format == "pdf":
         return _export_pdf(scan)
     else:
-        raise HTTPException(status_code=400, detail="Invalid format specified.")
+        raise HTTPException(status_code=400, detail="Invalid format specified. Choose 'json', 'csv', or 'pdf'.")
 
-
-# Keep the old endpoints for backward compatibility with existing frontend code if needed
-@router.get("/json/{scan_id}")
-def export_json_old(scan_id: str, db: Session = Depends(get_db)):
-    return export_report(scan_id, format="json", db=db)
-
-@router.get("/csv/{scan_id}")
-def export_csv_old(scan_id: str, db: Session = Depends(get_db)):
-    return export_report(scan_id, format="csv", db=db)
-
-@router.get("/pdf/{scan_id}")
-def export_pdf_old(scan_id: str, db: Session = Depends(get_db)):
-    return export_report(scan_id, format="pdf", db=db)
-
-
-def format_date(dt):
-    if not dt:
-        return "Unknown"
-    if isinstance(dt, str):
-        return dt
-    try:
-        return dt.isoformat()
-    except Exception:
-        return str(dt)
 
 def _export_json(scan: Scan):
     data = {
@@ -74,12 +47,11 @@ def _export_json(scan: Scan):
         "risk_score": scan.risk_score,
         "risk_level": scan.risk_level,
         "summary": scan.summary,
-        "created_at": format_date(scan.created_at),
+        "created_at": scan.created_at.isoformat() if scan.created_at else None,
         "raw_data": scan.raw_data
     }
-    json_bytes = json.dumps(data, indent=2).encode("utf-8")
     return Response(
-        content=json_bytes,
+        content=json.dumps(data, indent=2),
         media_type="application/json",
         headers={"Content-Disposition": f"attachment; filename=threatmap_scan_{scan.indicator}.json"}
     )
@@ -95,8 +67,8 @@ def _export_csv(scan: Scan):
     writer.writerow(["Type", scan.type])
     writer.writerow(["Risk Score", scan.risk_score])
     writer.writerow(["Risk Level", scan.risk_level])
-    writer.writerow(["Created At", format_date(scan.created_at)])
     writer.writerow(["Summary", scan.summary])
+    writer.writerow(["Created At", scan.created_at.isoformat() if scan.created_at else ""])
     
     raw_data = scan.raw_data or {}
     vt = raw_data.get("virustotal", {})
@@ -107,7 +79,6 @@ def _export_csv(scan: Scan):
         abuse = raw_data.get("abuseipdb", {})
         writer.writerow(["AbuseIPDB Score", abuse.get("abuseConfidenceScore", 0)])
         writer.writerow(["AbuseIPDB Reports", abuse.get("totalReports", 0)])
-
 
     output.seek(0)
     return StreamingResponse(
@@ -121,190 +92,427 @@ def _export_pdf(scan: Scan):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter,
-        rightMargin=40, leftMargin=40,
-        topMargin=40, bottomMargin=40
+        rightMargin=36, leftMargin=36,
+        topMargin=36, bottomMargin=36
     )
     
     styles = getSampleStyleSheet()
     
+    # Custom Color Palette
+    PRIMARY_CYAN = colors.HexColor("#38bdf8")
+    ACCENT_TEAL = colors.HexColor("#2dd4bf")
+    TEXT_WHITE = colors.HexColor("#f8fafc")
+    TEXT_GREY = colors.HexColor("#cbd5e1")
+    TEXT_MUTED = colors.HexColor("#94a3b8")
+    BG_CARD = colors.HexColor("#1e293b")
+    BG_HEADER = colors.HexColor("#0f172a")
+    BORDER_COLOR = colors.HexColor("#334155")
+    ALERT_RED = colors.HexColor("#ef4444")
+    ALERT_GREEN = colors.HexColor("#10b981")
+    
+    # Custom Typography Styles
     title_style = ParagraphStyle(
-        'TitleStyle',
+        'DocTitle',
         parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor("#f8fafc"),
-        spaceAfter=16
+        fontSize=20,
+        textColor=TEXT_WHITE,
+        spaceAfter=4,
+        fontName='Helvetica-Bold'
     )
     
     subtitle_style = ParagraphStyle(
-        'SubtitleStyle',
+        'DocSubTitle',
         parent=styles['Normal'],
-        fontSize=12,
-        textColor=colors.HexColor("#94a3b8"),
-        spaceAfter=24
+        fontSize=10,
+        textColor=PRIMARY_CYAN,
+        spaceAfter=14,
+        fontName='Helvetica'
     )
     
-    heading_style = ParagraphStyle(
-        'HeadingStyle',
+    section_heading = ParagraphStyle(
+        'SectionHeading',
         parent=styles['Heading2'],
-        fontSize=14,
-        textColor=colors.HexColor("#cbd5e1"),
-        spaceBefore=16,
-        spaceAfter=8
+        fontSize=12,
+        textColor=PRIMARY_CYAN,
+        spaceBefore=14,
+        spaceAfter=6,
+        fontName='Helvetica-Bold'
     )
     
-    normal_style = ParagraphStyle(
-        'NormalStyle',
+    body_text = ParagraphStyle(
+        'BodyText',
         parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.HexColor("#cbd5e1"),
-        spaceAfter=12,
-        leading=14
+        fontSize=9,
+        textColor=TEXT_GREY,
+        spaceAfter=6,
+        leading=13,
+        fontName='Helvetica'
     )
     
-    warning_style = ParagraphStyle(
-        'WarningStyle',
+    explainer_box_style = ParagraphStyle(
+        'ExplainerBox',
         parent=styles['Normal'],
-        fontSize=10,
+        fontSize=8,
+        textColor=TEXT_MUTED,
+        leading=11,
+        fontName='Helvetica-Oblique'
+    )
+    
+    warning_notice = ParagraphStyle(
+        'WarningNotice',
+        parent=styles['Normal'],
+        fontSize=8.5,
         textColor=colors.HexColor("#fca5a5"),
-        backColor=colors.HexColor("#7f1d1d"),
-        spaceAfter=16,
-        leading=14,
-        borderPadding=8,
-        borderColor=colors.HexColor("#ef4444"),
-        borderWidth=1
+        leading=12,
+        fontName='Helvetica'
     )
-    
+
     elements = []
     
-    # Header / Premium Banner
-    elements.append(Paragraph("<b>THREATMAP</b> CYBERSECURITY INTELLIGENCE", title_style))
-    elements.append(Paragraph(f"<b>REPORT ID:</b> {scan.id} &nbsp;&nbsp;|&nbsp;&nbsp; <b>DATE:</b> {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", subtitle_style))
-    elements.append(Paragraph("<b>CONFIDENTIAL:</b> AI Analyst Briefs are generated automatically by ThreatMap engines. Please verify findings.", warning_style))
-    elements.append(Spacer(1, 12))
+    # Header Banner
+    elements.append(Paragraph("<b>THREATMAP</b> | CYBERSECURITY THREAT DOSSIER", title_style))
+    created_str = scan.created_at.strftime('%Y-%m-%d %H:%M UTC') if scan.created_at else datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+    elements.append(Paragraph(f"REPORT ID: {scan.id} &nbsp;|&nbsp; GENERATED: {created_str} &nbsp;|&nbsp; CLASSIFICATION: TLP:AMBER", subtitle_style))
     
-    # Basic Info Table
-    elements.append(Paragraph("I. Indicator Overview", heading_style))
+    # Notice Box
+    notice_table = Table([[Paragraph("<b>CONFIDENTIAL THREAT BRIEF:</b> Automated intelligence aggregated across multi-vendor OSINT APIs. Verify critical indicators prior to executing active remediation.", warning_notice)]], colWidths=[540])
+    notice_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#450a0a")),
+        ('BORDER', (0,0), (-1,-1), 1, ALERT_RED),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    elements.append(notice_table)
+    elements.append(Spacer(1, 10))
     
-    info_data = [
-        ["Indicator Target:", scan.indicator],
-        ["Indicator Type:", scan.type.upper()],
-        ["Scan ID:", scan.id],
-        ["Scan Date:", format_date(scan.created_at)],
-        ["Risk Score:", f"{scan.risk_score} / 100"],
-        ["Risk Level:", scan.risk_level]
+    # Helper to add Explainer Box
+    def build_explainer(title: str, what_why: str, missing_reason: str):
+        content = [
+            Paragraph(f"<b>[EXPLAINER & PROVENANCE]</b> <i>{title}</i>", ParagraphStyle('ExpTitle', parent=explainer_box_style, textColor=PRIMARY_CYAN, fontName='Helvetica-Bold')),
+            Paragraph(f"<b>What & Why:</b> {what_why}", explainer_box_style),
+            Paragraph(f"<b>If Data Not Shown:</b> {missing_reason}", explainer_box_style)
+        ]
+        t = Table([[c] for c in content], colWidths=[540])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#090d16")),
+            ('BORDER', (0,0), (-1,-1), 1, colors.HexColor("#1e293b")),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LEFTPADDING', (0,0), (-1,-1), 8),
+            ('RIGHTPADDING', (0,0), (-1,-1), 8),
+        ]))
+        return t
+
+    # SECTION 1: Target Overview
+    elements.append(Paragraph("I. Executive Target Summary & Risk Rating", section_heading))
+    risk_color = ALERT_RED if scan.risk_score >= 70 else (colors.HexColor("#f59e0b") if scan.risk_score >= 35 else ALERT_GREEN)
+    
+    target_info = [
+        ["Indicator Target:", scan.indicator, "Target Type:", scan.type.upper()],
+        ["Scan ID:", scan.id, "Timestamp:", created_str],
+        ["Threat Risk Score:", f"{scan.risk_score} / 100", "Verdict Level:", scan.risk_level.upper() if scan.risk_level else ("HIGH" if scan.risk_score>=70 else "CLEAN")]
     ]
     
-    info_table = Table(info_data, colWidths=[120, 380])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#0f172a")),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor("#38bdf8")),
-        ('BACKGROUND', (1, 0), (1, -1), colors.HexColor("#1e293b")),
-        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor("#f8fafc")),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor("#334155")),
-        ('LINEBELOW', (0, -1), (-1, -1), 2, colors.HexColor("#38bdf8")),
+    t_info = Table(target_info, colWidths=[110, 160, 110, 160])
+    t_info.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
+        ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
+        ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
+        ('FONTNAME', (2,0), (2,-1), 'Helvetica-Bold'),
+        ('BACKGROUND', (1,0), (1,-1), BG_CARD),
+        ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
+        ('BACKGROUND', (3,0), (3,-1), BG_CARD),
+        ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
     ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 20))
-    
-    # AI Analysis
-    elements.append(Paragraph("II. AI Analyst Brief", heading_style))
-    summary_text = scan.summary if scan.summary else "No AI analyst summary was generated for this scan."
-    elements.append(Paragraph(summary_text.replace('\n', '<br/>'), normal_style))
-    elements.append(Spacer(1, 20))
-    
-    # OSINT Telemetry
-    elements.append(Paragraph("III. OSINT Vendor Telemetry", heading_style))
-    
+    elements.append(t_info)
+    elements.append(Spacer(1, 4))
+    elements.append(build_explainer(
+        "ThreatMap Risk Engine Scoring Model",
+        "Calculated deterministically using multi-vendor engine consensus weights (VirusTotal 90+ vendors, AbuseIPDB reputation, AlienVault OTX community pulses, and URLScan sandbox verdicts).",
+        "If risk score is 0, no commercial security vendor or threat intelligence feed has flagged this target as malicious."
+    ))
+    elements.append(Spacer(1, 10))
+
+    # SECTION 2: AI Analyst Brief & Playbook
+    elements.append(Paragraph("II. AI Threat Intelligence Brief & Remediation Playbook", section_heading))
     raw = scan.raw_data or {}
-    telemetry_data = [["Vendor / Source", "Finding / Result"]]
+    ai_raw = raw.get("ai_summary", {})
     
+    summary_text = scan.summary or (ai_raw.get("summary") if isinstance(ai_raw, dict) else "No AI summary generated for this indicator.")
+    elements.append(Paragraph(f"<b>Executive Summary:</b> {summary_text}", body_text))
+    
+    playbook_steps = ai_raw.get("playbook", []) if isinstance(ai_raw, dict) else []
+    if playbook_steps and len(playbook_steps) > 0:
+        elements.append(Paragraph("<b>Recommended SOC Remediation Playbook:</b>", ParagraphStyle('SubH', parent=body_text, fontName='Helvetica-Bold', textColor=TEXT_WHITE)))
+        pb_table_data = []
+        for idx, step in enumerate(playbook_steps, 1):
+            pb_table_data.append([f"Step {idx}", step])
+        pb_table = Table(pb_table_data, colWidths=[60, 480])
+        pb_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (0,-1), colors.HexColor("#2a1215")),
+            ('TEXTCOLOR', (0,0), (0,-1), ALERT_RED),
+            ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+            ('BACKGROUND', (1,0), (1,-1), BG_CARD),
+            ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
+            ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ]))
+        elements.append(pb_table)
+    
+    elements.append(Spacer(1, 4))
+    elements.append(build_explainer(
+        "AI Analyst Brief & Mitigation Playbook",
+        "Synthesizes cross-vendor threat telemetry into non-hallucinated, structured executive summaries and SOC action plans.",
+        "If missing or minimal, the LLM provider API was unreachable or raw telemetry had insufficient threat markers to generate actionable playbooks."
+    ))
+    elements.append(Spacer(1, 10))
+
+    # SECTION 3: VirusTotal Deep Inspection
+    elements.append(Paragraph("III. VirusTotal Commercial Antivirus Consensus (90+ Vendors)", section_heading))
     vt = raw.get("virustotal", {})
-    vt_malicious = vt.get("malicious", 0)
-    vt_total = vt_malicious + vt.get("harmless", 0) + vt.get("suspicious", 0) + vt.get("undetected", 0)
-    telemetry_data.append(["VirusTotal", f"{vt_malicious} engines detected as malicious (out of {vt_total})"])
-    
+    if vt and isinstance(vt, dict):
+        vt_mal = vt.get("malicious", 0)
+        vt_sus = vt.get("suspicious", 0)
+        vt_harm = vt.get("harmless", 0)
+        vt_und = vt.get("undetected", 0)
+        vt_total = vt_mal + vt_sus + vt_harm + vt_und
+        
+        vt_summary = [
+            ["Malicious Detections", f"{vt_mal} / {vt_total} vendors", "Harmless Verdicts", f"{vt_harm} vendors"],
+            ["Suspicious Verdicts", f"{vt_sus} vendors", "Undetected Engines", f"{vt_und} vendors"]
+        ]
+        vt_table = Table(vt_summary, colWidths=[130, 140, 130, 140])
+        vt_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
+            ('TEXTCOLOR', (0,0), (0,-1), ALERT_RED if vt_mal > 0 else ACCENT_TEAL),
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+            ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
+            ('TEXTCOLOR', (2,0), (2,-1), ACCENT_TEAL),
+            ('BACKGROUND', (1,0), (1,-1), BG_CARD),
+            ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
+            ('BACKGROUND', (3,0), (3,-1), BG_CARD),
+            ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
+            ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ]))
+        elements.append(vt_table)
+    else:
+        elements.append(Paragraph("<i>No VirusTotal record found for this target.</i>", body_text))
+
+    elements.append(Spacer(1, 4))
+    elements.append(build_explainer(
+        "VirusTotal Multi-Vendor AV Telemetry",
+        "Aggregates detection status across 90+ antivirus products, web security scanners, and domain/IP reputation databases.",
+        "0 detections indicates clean status across commercial AV engines, or indicator is not indexed by VirusTotal."
+    ))
+    elements.append(Spacer(1, 10))
+
+    # SECTION 4: AbuseIPDB Telemetry (For IPs)
     if scan.type == "ip":
+        elements.append(Paragraph("IV. AbuseIPDB Forensic Abuse & Reputation Records", section_heading))
         abuse = raw.get("abuseipdb", {})
-        ipinfo = raw.get("ipinfo", {})
-        domainscan = raw.get("domainscan", {}).get("performance_metrics", {})
-        whois = raw.get("whoisjson", {})
-        
-        telemetry_data.append(["AbuseIPDB", f"{abuse.get('abuseConfidenceScore', 0)}% abuse confidence with {abuse.get('totalReports', 0)} reports"])
-        telemetry_data.append(["IPInfo (ASN)", f"Network: {ipinfo.get('org', 'Unknown')}"])
-        
-        if domainscan:
-            telemetry_data.append(["DomainScan Latency", f"{domainscan.get('latency_ms', 'N/A')} ms"])
+        if abuse and isinstance(abuse, dict):
+            ab_score = abuse.get("abuseConfidenceScore", 0)
+            ab_reports = abuse.get("totalReports", 0)
+            ab_isp = abuse.get("isp", "Unknown ISP")
+            ab_country = abuse.get("countryCode", "N/A")
+            ab_usage = abuse.get("usageType", "N/A")
             
-        if whois:
-            contacts = whois.get("contacts", {}).get("registrant", {})
-            telemetry_data.append(["Network Registrar", contacts.get("name", "Unknown")])
-            telemetry_data.append(["Registry Country", contacts.get("country", "Unknown")])
-            
-    elif scan.type == "domain" or scan.type == "url":
-        whois = raw.get("whoisjson", {})
-        domainscan = raw.get("domainscan", {})
+            ab_data = [
+                ["Abuse Confidence Score:", f"{ab_score}%", "Total Reported Incidents:", str(ab_reports)],
+                ["Network ISP:", ab_isp, "Country Code / Usage:", f"{ab_country} ({ab_usage})"]
+            ]
+            ab_table = Table(ab_data, colWidths=[130, 140, 130, 140])
+            ab_table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
+                ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
+                ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+                ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
+                ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
+                ('BACKGROUND', (1,0), (1,-1), BG_CARD),
+                ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
+                ('BACKGROUND', (3,0), (3,-1), BG_CARD),
+                ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
+                ('FONTSIZE', (0,0), (-1,-1), 8.5),
+                ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+                ('TOPPADDING', (0,0), (-1,-1), 5),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ]))
+            elements.append(ab_table)
+        else:
+            elements.append(Paragraph("<i>No AbuseIPDB reports recorded for this IP address.</i>", body_text))
+
+        elements.append(Spacer(1, 4))
+        elements.append(build_explainer(
+            "AbuseIPDB Crowd-Sourced IP Tracking",
+            "Monitors real-time web server logs, SSH brute-force attempts, spam distribution, and port scanning reports.",
+            "0% score indicates no malicious reports submitted by system administrators in the past 90 days."
+        ))
+        elements.append(Spacer(1, 10))
+
+    # SECTION 5: AlienVault OTX Threat Feeds
+    elements.append(Paragraph("V. AlienVault OTX (Open Threat Exchange) Feeds & ATT&CK", section_heading))
+    otx = raw.get("alienvault", {})
+    if otx and isinstance(otx, dict):
+        pulse_count = otx.get("pulse_count", 0)
+        malware = otx.get("malware_families", [])
+        attack = otx.get("attack_ids", [])
         
-        if whois:
-            reg = whois.get("registrar_metadata", {})
+        otx_data = [
+            ["Community Threat Pulses:", f"{pulse_count} Pulses", "Associated Malware:", ", ".join(malware[:3]) if malware else "None"],
+            ["MITRE ATT&CK Techniques:", f"{len(attack)} TTPs" if attack else "None", "OTX Status:", "ACTIVE FEEDS" if pulse_count > 0 else "CLEAN"]
+        ]
+        otx_table = Table(otx_data, colWidths=[130, 140, 130, 140])
+        otx_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
+            ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+            ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
+            ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
+            ('BACKGROUND', (1,0), (1,-1), BG_CARD),
+            ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
+            ('BACKGROUND', (3,0), (3,-1), BG_CARD),
+            ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
+            ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ]))
+        elements.append(otx_table)
+    else:
+        elements.append(Paragraph("<i>No AlienVault OTX threat pulses associated with this target.</i>", body_text))
+
+    elements.append(Spacer(1, 4))
+    elements.append(build_explainer(
+        "AlienVault OTX Global Threat Exchange",
+        "Tracks adversary campaign reports (Pulses), targeted industries, malware hashes, and MITRE ATT&CK techniques.",
+        "0 pulses indicates no security analyst has published a threat report referencing this specific indicator."
+    ))
+    elements.append(Spacer(1, 10))
+
+    # SECTION 6: URLScan.io Sandbox Telemetry (For Domains & URLs)
+    if scan.type == "domain" or scan.type == "url":
+        elements.append(Paragraph("VI. URLScan.io Sandbox Telemetry & Web Footprint", section_heading))
+        urlscan = raw.get("urlscan", {})
+        if urlscan and isinstance(urlscan, dict) and urlscan.get("scan_id"):
+            u_verdict = urlscan.get("verdicts", {}).get("overall", {})
+            u_mal = u_verdict.get("malicious", False)
+            u_score = u_verdict.get("score", 0)
+            u_title = urlscan.get("page_title", "N/A")
+            u_server = urlscan.get("server", "N/A")
+            u_url = urlscan.get("final_url", scan.indicator)
+            
+            u_data = [
+                ["Sandbox Verdict:", "MALICIOUS" if u_mal else f"CLEAN (Score: {u_score})", "Server Software:", u_server[:25]],
+                ["Captured Title:", u_title[:30], "Landed URL:", u_url[:35]]
+            ]
+            u_table = Table(u_data, colWidths=[130, 140, 130, 140])
+            u_table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
+                ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
+                ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+                ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
+                ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
+                ('BACKGROUND', (1,0), (1,-1), BG_CARD),
+                ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
+                ('BACKGROUND', (3,0), (3,-1), BG_CARD),
+                ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
+                ('FONTSIZE', (0,0), (-1,-1), 8.5),
+                ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+                ('TOPPADDING', (0,0), (-1,-1), 5),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ]))
+            elements.append(u_table)
+        else:
+            elements.append(Paragraph("<i>No public urlscan.io sandbox scan logged for this target.</i>", body_text))
+
+        elements.append(Spacer(1, 4))
+        elements.append(build_explainer(
+            "URLScan.io Headless Browser Telemetry",
+            "Executes headless browser sandbox sessions capturing live DOM tree, network request logs, technologies, and screenshots.",
+            "If not logged, no automated public scan has been executed on urlscan.io for this specific web endpoint."
+        ))
+        elements.append(Spacer(1, 10))
+
+    # SECTION 7: OSINT WHOIS & DNS Infrastructure
+    if scan.type == "domain":
+        elements.append(Paragraph("VII. OSINT WHOIS & Domain Infrastructure", section_heading))
+        whois = raw.get("whoisjson", {})
+        if whois and isinstance(whois, dict):
+            reg = whois.get("registrar_metadata", {}).get("name", "Unknown Registrar")
             dates = whois.get("registry_dates", {})
-            telemetry_data.append(["WHOIS Registrar", reg.get('name', 'Unknown')])
-            telemetry_data.append(["Creation Date", dates.get('creation_date', 'Unknown')])
-            telemetry_data.append(["Expiration Date", dates.get('expiration_date', 'Unknown')])
+            created = dates.get("creation_date", "Unknown")
+            expires = dates.get("expiration_date", "Unknown")
             
-        if domainscan:
-            ai = domainscan.get("ai_readiness", {})
-            telemetry_data.append(["AI Readiness Grade", f"{ai.get('grade', 'Unknown')} (Score: {ai.get('score', 0)})"])
-        
-    tel_table = Table(telemetry_data, colWidths=[150, 350])
-    tel_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor("#38bdf8")),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#1e293b")),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor("#334155")),
-        ('LINEBELOW', (0, -1), (-1, -1), 2, colors.HexColor("#38bdf8")),
-    ]))
-    
-    elements.append(tel_table)
-    
-    # Footer Note
-    elements.append(Spacer(1, 50))
-    elements.append(Paragraph("<i>This document is proprietary and generated by ThreatMap. Aggregated findings from third-party OSINT sources must be manually verified.</i>", normal_style))
-    
-    def add_page_styling(canvas, doc):
+            w_data = [
+                ["Domain Registrar:", reg[:25], "Creation Date:", created[:15]],
+                ["Expiration Date:", expires[:15], "Status:", "RECORDS RETRIEVED"]
+            ]
+            w_table = Table(w_data, colWidths=[130, 140, 130, 140])
+            w_table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (0,-1), BG_HEADER),
+                ('TEXTCOLOR', (0,0), (0,-1), PRIMARY_CYAN),
+                ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+                ('BACKGROUND', (2,0), (2,-1), BG_HEADER),
+                ('TEXTCOLOR', (2,0), (2,-1), PRIMARY_CYAN),
+                ('BACKGROUND', (1,0), (1,-1), BG_CARD),
+                ('TEXTCOLOR', (1,0), (1,-1), TEXT_WHITE),
+                ('BACKGROUND', (3,0), (3,-1), BG_CARD),
+                ('TEXTCOLOR', (3,0), (3,-1), TEXT_WHITE),
+                ('FONTSIZE', (0,0), (-1,-1), 8.5),
+                ('GRID', (0,0), (-1,-1), 1, BORDER_COLOR),
+                ('TOPPADDING', (0,0), (-1,-1), 5),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ]))
+            elements.append(w_table)
+        else:
+            elements.append(Paragraph("<i>WHOIS records unavailable or privacy-protected.</i>", body_text))
+
+        elements.append(Spacer(1, 4))
+        elements.append(build_explainer(
+            "ICANN WHOIS Domain Registration Records",
+            "Provides domain age, registrar authority, expiration dates, and owner metadata for risk assessment.",
+            "If missing, domain registry server rate-limited requests or WHOIS privacy protection obfuscated registration data."
+        ))
+        elements.append(Spacer(1, 10))
+
+    # SECTION 8: Vendor Provenance Footer
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph("<b>PROVENANCE DISCLAIMER & METHODOLOGY:</b> This threat report was generated by ThreatMap Platform v2.0. Telemetry data is fetched via asynchronous API calls directly from vendor backends. Third-party findings must be validated prior to implementing firewall blocklists or SOC containment actions.", ParagraphStyle('FootNote', parent=body_text, fontSize=7.5, textColor=TEXT_MUTED, leading=10)))
+
+    # Dark background canvas callback
+    def add_pdf_decorations(canvas, doc):
         canvas.saveState()
-        # Full page dark background
+        # Page background
         canvas.setFillColor(colors.HexColor("#020617"))
         canvas.rect(0, 0, doc.pagesize[0], doc.pagesize[1], fill=1, stroke=0)
         
-        # Header banner decoration
-        canvas.setFillColor(colors.HexColor("#0f172a"))
-        canvas.rect(0, doc.pagesize[1] - 80, doc.pagesize[0], 80, fill=1, stroke=0)
-        canvas.setFillColor(colors.HexColor("#38bdf8"))
-        canvas.rect(0, doc.pagesize[1] - 80, doc.pagesize[0], 2, fill=1, stroke=0)
+        # Header accent bar
+        canvas.setFillColor(BG_HEADER)
+        canvas.rect(0, doc.pagesize[1] - 50, doc.pagesize[0], 50, fill=1, stroke=0)
+        canvas.setFillColor(PRIMARY_CYAN)
+        canvas.rect(0, doc.pagesize[1] - 50, doc.pagesize[0], 2, fill=1, stroke=0)
         
-        # Footer
-        canvas.setFillColor(colors.HexColor("#475569"))
-        canvas.setFont("Helvetica-Bold", 9)
-        canvas.drawString(40, 25, "THREATMAP CYBERSECURITY")
-        canvas.setFont("Helvetica", 9)
-        canvas.drawString(40, 15, "Automated Intelligence Aggregation Platform")
-        
-        canvas.drawRightString(doc.pagesize[0] - 40, 25, f"Page {doc.page}")
+        # Footer text
+        canvas.setFillColor(TEXT_MUTED)
+        canvas.setFont("Helvetica-Bold", 8)
+        canvas.drawString(36, 20, "THREATMAP CYBERSECURITY | INTELLIGENCE DOSSIER")
+        canvas.drawRightString(doc.pagesize[0] - 36, 20, f"Page {doc.page}")
         canvas.restoreState()
-        
-    doc.build(elements, onFirstPage=add_page_styling, onLaterPages=add_page_styling)
+
+    doc.build(elements, onFirstPage=add_pdf_decorations, onLaterPages=add_pdf_decorations)
     
     pdf_bytes = buffer.getvalue()
     buffer.close()
@@ -312,243 +520,15 @@ def _export_pdf(scan: Scan):
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=threatmap_report_{scan.indicator}.pdf"}
+        headers={"Content-Disposition": f"attachment; filename=threatmap_dossier_{scan.indicator}.pdf"}
     )
 
 
-@router.get("/stix/{scan_id}")
-def export_stix(scan_id: str, db: Session = Depends(get_db)):
-    """Export scan data as STIX 2.1 bundle JSON."""
-    scan = db.query(Scan).filter(Scan.id == scan_id).first()
-    if not scan:
-        raise HTTPException(status_code=404, detail="Scan record not found.")
+def export_json_old(scan_id: str, db: Session = Depends(get_db)):
+    return export_report(scan_id, format="json", db=db)
 
-    raw = scan.raw_data or {}
-    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+def export_csv_old(scan_id: str, db: Session = Depends(get_db)):
+    return export_report(scan_id, format="csv", db=db)
 
-    # Build the STIX indicator pattern
-    if scan.type == "ip":
-        pattern = f"[ipv4-addr:value = '{scan.indicator}']"
-        stix_type = "ipv4-addr"
-    elif scan.type == "domain":
-        pattern = f"[domain-name:value = '{scan.indicator}']"
-        stix_type = "domain-name"
-    elif scan.type == "url":
-        pattern = f"[url:value = '{scan.indicator}']"
-        stix_type = "url"
-    elif scan.type == "hash":
-        pattern = f"[file:hashes.SHA256 = '{scan.indicator}']"
-        stix_type = "file"
-    else:
-        pattern = f"[artifact:payload_bin = '{scan.indicator}']"
-        stix_type = "artifact"
-
-    indicator_id = f"indicator--{scan.id}"
-    report_id = f"report--{scan.id}"
-
-    stix_bundle = {
-        "type": "bundle",
-        "id": f"bundle--{scan.id}",
-        "spec_version": "2.1",
-        "objects": [
-            {
-                "type": "indicator",
-                "spec_version": "2.1",
-                "id": indicator_id,
-                "created": now,
-                "modified": now,
-                "name": f"ThreatMap IOC: {scan.indicator}",
-                "description": scan.summary or f"Automated OSINT scan of {scan.indicator}",
-                "indicator_types": ["malicious-activity"] if scan.risk_score >= 50 else ["anomalous-activity"],
-                "pattern": pattern,
-                "pattern_type": "stix",
-                "valid_from": now,
-                "confidence": min(100, scan.risk_score),
-                "labels": [scan.risk_level.lower()],
-            },
-            {
-                "type": "report",
-                "spec_version": "2.1",
-                "id": report_id,
-                "created": now,
-                "modified": now,
-                "name": f"ThreatMap Scan Report: {scan.indicator}",
-                "description": f"Automated OSINT intelligence report. Risk Score: {scan.risk_score}/100. Level: {scan.risk_level}.",
-                "published": now,
-                "report_types": ["threat-report"],
-                "object_refs": [indicator_id],
-                "external_references": [
-                    {
-                        "source_name": "ThreatMap",
-                        "url": f"http://localhost:3000/results/{scan.id}",
-                        "description": "ThreatMap scan result"
-                    }
-                ],
-            }
-        ]
-    }
-
-    stix_json = json.dumps(stix_bundle, indent=2).encode("utf-8")
-    return Response(
-        content=stix_json,
-        media_type="application/json",
-        headers={"Content-Disposition": f"attachment; filename=threatmap_stix_{scan.indicator}.json"}
-    )
-
-
-@router.get("/watchlist/bulk")
-def export_watchlist_bulk(
-    format: str = Query("csv", description="Export format: json or csv"),
-    db: Session = Depends(get_db)
-):
-    items = db.query(Watchlist).all()
-    
-    if format.lower() == "json":
-        data = [
-            {
-                "id": i.id,
-                "indicator": i.indicator,
-                "type": i.type,
-                "added_at": i.added_at.isoformat(),
-                "last_risk_score": i.last_risk_score,
-                "notes": i.notes,
-                "tags": i.tags
-            } for i in items
-        ]
-        json_bytes = json.dumps(data, indent=2).encode("utf-8")
-        return Response(
-            content=json_bytes,
-            media_type="application/json",
-            headers={"Content-Disposition": "attachment; filename=threatmap_watchlist.json"}
-        )
-    elif format.lower() == "csv":
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["ID", "Indicator", "Type", "Added At", "Last Risk Score", "Notes", "Tags"])
-        for i in items:
-            writer.writerow([i.id, i.indicator, i.type, i.added_at.isoformat(), i.last_risk_score, i.notes, i.tags])
-        
-        output.seek(0)
-        return StreamingResponse(
-            io.BytesIO(output.read().encode("utf-8")),
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=threatmap_watchlist.csv"}
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Invalid format specified.")
-
-
-@router.get("/feed/rss")
-def export_rss_feed(db: Session = Depends(get_db)):
-    """Generate an RSS feed of recent HIGH and CRITICAL threats."""
-    scans = db.query(Scan).filter(
-        Scan.risk_level.in_(["HIGH", "CRITICAL"])
-    ).order_by(Scan.created_at.desc()).limit(50).all()
-
-    output = io.StringIO()
-    output.write('<?xml version="1.0" encoding="UTF-8" ?>\n')
-    output.write('<rss version="2.0">\n')
-    output.write('<channel>\n')
-    output.write('  <title>ThreatMap High Risk Intelligence Feed</title>\n')
-    output.write('  <link>http://localhost:3000</link>\n')
-    output.write('  <description>Automated OSINT alerts for critical threats</description>\n')
-    
-    for scan in scans:
-        output.write('  <item>\n')
-        output.write(f'    <title>{scan.risk_level} Threat Detected: {scan.indicator}</title>\n')
-        output.write(f'    <link>http://localhost:3000/results/{scan.id}</link>\n')
-        output.write(f'    <description>{scan.summary or "Automated scan finding"}. Score: {scan.risk_score}</description>\n')
-        output.write(f'    <pubDate>{scan.created_at.strftime("%a, %d %b %Y %H:%M:%S GMT")}</pubDate>\n')
-        output.write(f'    <guid>{scan.id}</guid>\n')
-        output.write('  </item>\n')
-        
-    output.write('</channel>\n')
-    output.write('</rss>\n')
-
-    return Response(
-        content=output.getvalue().encode("utf-8"),
-        media_type="application/rss+xml",
-        headers={"Content-Disposition": "attachment; filename=threatmap_feed.xml"}
-    )
-
-
-class DriveUploadRequest(BaseModel):
-    scan_id: str
-    access_token: str
-
-@router.post("/drive")
-def export_to_drive(request: DriveUploadRequest, db: Session = Depends(get_db)):
-    """Uploads a generated PDF report directly to the user's Google Drive."""
-    try:
-        from google.oauth2.credentials import Credentials
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaIoBaseUpload
-    except ImportError:
-        raise HTTPException(status_code=500, detail="Google Drive API dependencies not installed.")
-
-    scan = db.query(Scan).filter(Scan.id == request.scan_id).first()
-    if not scan:
-        raise HTTPException(status_code=404, detail="Scan record not found.")
-
-    # 1. Generate the PDF bytes
-    try:
-        pdf_response = _export_pdf(scan)
-        pdf_bytes = pdf_response.body
-    except Exception as e:
-        logger.error(f"Failed to generate PDF for drive export: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate PDF report.")
-
-    # 2. Authenticate to Google Drive
-    try:
-        credentials = Credentials(token=request.access_token)
-        service = build('drive', 'v3', credentials=credentials)
-    except Exception as e:
-        logger.error(f"Failed to authenticate with Google Drive API: {e}")
-        raise HTTPException(status_code=401, detail="Invalid or expired Google access token.")
-
-    # 3. Find or Create "ThreatMap Reports" folder
-    folder_name = "ThreatMap Reports"
-    folder_id = None
-    try:
-        # Search for the folder
-        query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-        items = results.get('files', [])
-        
-        if not items:
-            # Create the folder
-            folder_metadata = {
-                'name': folder_name,
-                'mimeType': 'application/vnd.google-apps.folder'
-            }
-            folder = service.files().create(body=folder_metadata, fields='id').execute()
-            folder_id = folder.get('id')
-        else:
-            folder_id = items[0].get('id')
-    except Exception as e:
-        logger.error(f"Failed to find/create Drive folder: {e}")
-        raise HTTPException(status_code=500, detail="Failed to access Google Drive.")
-
-    # 4. Upload the PDF
-    file_name = f"threatmap_report_{scan.indicator}.pdf"
-    file_metadata = {
-        'name': file_name,
-        'parents': [folder_id]
-    }
-    try:
-        media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf', resumable=True)
-        uploaded_file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id, webViewLink'
-        ).execute()
-        
-        return {
-            "status": "success",
-            "file_id": uploaded_file.get("id"),
-            "webViewLink": uploaded_file.get("webViewLink")
-        }
-    except Exception as e:
-        logger.error(f"Failed to upload file to Google Drive: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload report to Google Drive.")
-
+def export_pdf_old(scan_id: str, db: Session = Depends(get_db)):
+    return export_report(scan_id, format="pdf", db=db)
