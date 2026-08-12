@@ -31,10 +31,10 @@ COUNTRY_COORDS = {
 
 def extract_map_points_from_db(db: Session) -> list:
     """
-    Scans ALL database entries to construct a 100% complete, deduplicated array of map points.
+    Scans recent database entries to construct a deduplicated array of map points.
     Extracts lat/lon from ipinfo, ip_geolocation, urlscan, whoisjson, or fallback country coords.
     """
-    scans = db.query(Scan).order_by(Scan.created_at.desc()).all()
+    scans = db.query(Scan).order_by(Scan.created_at.desc()).limit(100).all()
     unique_points = {}
     
     for s in scans:

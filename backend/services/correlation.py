@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 from models.database import Scan
 import ipaddress
 
@@ -28,6 +28,9 @@ def get_correlated_iocs(scan: Scan, db: Session) -> dict:
             related_scans = (
                 db.query(Scan)
                 .filter(Scan.type == "ip", Scan.id != scan.id)
+                .options(defer(Scan.raw_data))
+                .order_by(Scan.created_at.desc())
+                .limit(50)
                 .all()
             )
             seen_subnet = set()
@@ -87,6 +90,9 @@ def get_correlated_iocs(scan: Scan, db: Session) -> dict:
         related = (
             db.query(Scan)
             .filter(Scan.type.in_(["domain", "url"]), Scan.id != scan.id)
+            .options(defer(Scan.raw_data))
+            .order_by(Scan.created_at.desc())
+            .limit(50)
             .all()
         )
         seen_domain = set()

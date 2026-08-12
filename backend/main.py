@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 try:
     from core.config import settings
@@ -357,8 +357,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         # 4. Monitored IOCs (Watchlist size)
         watchlist_count = db.query(Watchlist).count()
 
-        # 5. Recent scans
-        recent_scans = db.query(Scan).order_by(Scan.created_at.desc()).limit(10).all()
+        # 5. Recent scans (defer raw_data to minimize egress)
+        recent_scans = db.query(Scan).options(defer(Scan.raw_data)).order_by(Scan.created_at.desc()).limit(10).all()
 
         # 6. Active alerts
         active_alerts = db.query(Alert).filter(Alert.is_dismissed == False).order_by(Alert.created_at.desc()).limit(15).all()
